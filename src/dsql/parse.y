@@ -589,6 +589,12 @@ using namespace Firebird;
 %token <metaNamePtr> REGR_SXY
 %token <metaNamePtr> REGR_SYY
 
+// tokens added for Firebird 4.0
+
+%token <metaNamePtr> MESSAGE
+%token <metaNamePtr> RDB_ERROR
+
+
 // precedence declarations for expression evaluation
 
 %left	OR
@@ -6716,7 +6722,24 @@ internal_info
 		{ $$ = newNode<InternalInfoNode>(MAKE_const_slong(INFO_TYPE_SQLSTATE)); }
 	| ROW_COUNT
 		{ $$ = newNode<InternalInfoNode>(MAKE_const_slong(INFO_TYPE_ROWS_AFFECTED)); }
+	| RDB_ERROR '(' error_context ')'
+		{ $$ = newNode<InternalInfoNode>(MAKE_const_slong($3)); }
 	;
+
+%type <int32Val> error_context
+error_context
+	: GDSCODE
+		{ $$ = INFO_TYPE_GDSCODE; }
+	| SQLCODE
+		{ $$ = INFO_TYPE_SQLCODE; }
+	| SQLSTATE
+		{ $$ = INFO_TYPE_SQLSTATE; }
+	| EXCEPTION
+		{ $$ = INFO_TYPE_EXCEPTION; }
+	| MESSAGE
+		{ $$ = INFO_TYPE_ERROR_MSG; }
+	;
+
 
 %type <intlStringPtr> sql_string
 sql_string
@@ -7736,6 +7759,7 @@ non_reserved_word
 	| SERVERWIDE
 	| INCREMENT
 	| TRUSTED
+	| MESSAGE		// added in FB 4.0
 	;
 
 %%

@@ -53,7 +53,9 @@
 #define ttype_ascii				CS_ASCII		// 2
 #define ttype_binary			CS_BINARY		// 1
 #define ttype_unicode_fss		CS_UNICODE_FSS	// 3
-#define ttype_last_internal		CS_UTF8			// 4 	// not internal yet, but will be in the future
+#define ttype_utf8				CS_UTF8			// 4 	// not internal yet, but will be in the future
+
+#define ttype_last_internal		ttype_utf8		// 4 	// not internal yet, but will be in the future
 
 #define ttype_dynamic			CS_dynamic	// use att_charset
 
