@@ -15,4 +15,4 @@
 #define FB_REV_NO "2"
 #define FB_BUILD_NO "32703"
 #define FB_BUILD_TYPE "V"
-#define FB_BUILD_SUFFIX "Firebird 3.0"
+#define FB_BUILD_SUFFIX "Firebird 3.0 Custom"
