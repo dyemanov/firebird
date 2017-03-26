@@ -2506,8 +2506,14 @@ static bool check_datatype(thread_db* tdbb, SSHORT phase, DeferredWork* work, jr
 				REDUCED TO X.RDB$RELATION_NAME
 			{
 				jrd_rel* const relation = MET_lookup_relation(tdbb, X.RDB$RELATION_NAME);
-				if (!relation || relation->rel_view_rse)
+				if (!relation || relation->isView() || relation->isVirtual() || relation->isTemporary())
 					continue;
+
+				if (!(relation->rel_flags & REL_scanned) ||
+					(relation->rel_flags & REL_being_scanned))
+				{
+					MET_scan_relation(tdbb, relation);
+				}
 
 				HalfStaticArray<CheckFieldDatatype, 4> fields;
 
