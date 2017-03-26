@@ -125,6 +125,7 @@
 #include "../jrd/CryptoManager.h"
 #include "../jrd/Mapping.h"
 #include "../jrd/shut_proto.h"
+#include "../jrd/vio_proto.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -484,6 +485,7 @@ static bool grant_privileges(thread_db*, SSHORT, DeferredWork*, jrd_tra*);
 static bool db_crypt(thread_db*, SSHORT, DeferredWork*, jrd_tra*);
 static bool set_linger(thread_db*, SSHORT, DeferredWork*, jrd_tra*);
 static bool clear_mapping(thread_db*, SSHORT, DeferredWork*, jrd_tra*);
+static bool check_datatype(thread_db*, SSHORT, DeferredWork*, jrd_tra*);
 
 // ----------------------------------------------------------------
 
@@ -668,6 +670,17 @@ struct deferred_task
 
 namespace
 {
+	struct CheckFieldDatatype
+	{
+		CheckFieldDatatype()
+		{
+			memset(this, 0, sizeof(*this));
+		}
+
+		USHORT id;
+		impure_value_ex value;
+	};
+
 	template <typename Self, typename T, int objType,
 		T* (*lookupById)(thread_db*, USHORT, bool, bool, USHORT),
 		T* (*lookupByName)(Jrd::thread_db*, const QualifiedName&, bool),
@@ -1179,6 +1192,7 @@ static const deferred_task task_table[] =
 	{ dfw_db_crypt, db_crypt },
 	{ dfw_set_linger, set_linger },
 	{ dfw_clear_mapping, clear_mapping },
+	{ dfw_check_datatype, check_datatype },
 	{ dfw_null, NULL }
 };
 
@@ -2449,6 +2463,186 @@ static bool check_not_null(thread_db* tdbb, SSHORT phase, DeferredWork* work, jr
 				if (hasError)
 					ERR_post(errs);
 			}
+		}
+
+		break;
+	}
+
+	return false;
+}
+
+
+static bool check_datatype(thread_db* tdbb, SSHORT phase, DeferredWork* work, jrd_tra* transaction)
+{
+/**************************************
+ *
+ *	c h e c k _ d a t a t y p e
+ *
+ **************************************
+ *
+ * Scan relation and fake conversion of the altered field(s) to the new datatype(s).
+ *
+ **************************************/
+
+	SET_TDBB(tdbb);
+
+	Jrd::Attachment* attachment = tdbb->getAttachment();
+
+	switch (phase)
+	{
+	case 1:
+	case 2:
+		return true;
+
+	case 3:
+		{
+			const MetaName fieldName = work->dfw_name.c_str();
+
+			AutoRequest handle1;
+
+			FOR(REQUEST_HANDLE handle1)
+				X IN RDB$RELATION_FIELDS WITH
+					X.RDB$FIELD_SOURCE EQ fieldName.c_str()
+				REDUCED TO X.RDB$RELATION_NAME
+			{
+				jrd_rel* const relation = MET_lookup_relation(tdbb, X.RDB$RELATION_NAME);
+				if (!relation || relation->rel_view_rse)
+					continue;
+
+				HalfStaticArray<CheckFieldDatatype, 4> fields;
+
+				AutoRequest handle2;
+
+				FOR(REQUEST_HANDLE handle2)
+					RFL IN RDB$RELATION_FIELDS CROSS
+					FLD IN RDB$FIELDS
+					WITH RFL.RDB$RELATION_NAME EQ X.RDB$RELATION_NAME AND
+						 FLD.RDB$FIELD_NAME EQ RFL.RDB$FIELD_SOURCE AND
+						 FLD.RDB$FIELD_NAME EQ fieldName.c_str()
+					{
+						CheckFieldDatatype field;
+
+						field.id = RFL.RDB$FIELD_ID;
+						DSC_make_descriptor(&field.value.vlu_desc, FLD.RDB$FIELD_TYPE,
+											FLD.RDB$FIELD_SCALE, FLD.RDB$FIELD_LENGTH,
+											FLD.RDB$FIELD_SUB_TYPE, FLD.RDB$CHARACTER_SET_ID,
+											RFL.RDB$COLLATION_ID.NULL ? FLD.RDB$COLLATION_ID : RFL.RDB$COLLATION_ID);
+						field.value.vlu_desc.dsc_address = (UCHAR*) &field.value.vlu_misc;
+
+						fields.add(field);
+					}
+				END_FOR
+
+				// Protect relation from modification
+				ProtectRelations protectRelation(tdbb, transaction, relation);
+
+				FbLocalStatus localStatus;
+
+				record_param rpb;
+				rpb.rpb_relation = relation;
+				rpb.rpb_number.setValue(BOF_NUMBER);
+
+				while (VIO_next_record(tdbb, &rpb, transaction, tdbb->getDefaultPool(), false))
+				{
+					Record* const record = rpb.rpb_record;
+
+					for (CheckFieldDatatype* iter = fields.begin(); iter != fields.end(); ++iter)
+					{
+						dsc desc;
+						if (EVL_field(relation, record, iter->id, &desc))
+						{
+							try
+							{
+								MOV_move(tdbb, &desc, &iter->value.vlu_desc);
+							}
+							catch (Exception& ex)
+							{
+								const jrd_fld* const field = MET_get_field(relation, iter->id);
+
+								string error1;
+								error1.printf("Data in column %s.%s cannot be converted to the target data type",
+											  relation->rel_name.c_str(), field->fld_name.c_str());
+
+								const int MAX_KEY_STRING_LEN = 250;
+
+								fb_assert(!desc.isBlob());
+
+								string value = MOV_make_string2(tdbb, &desc, ttype_dynamic);
+
+								const int len = (int) value.length();
+								const char* const str = value.c_str();
+
+								if (desc.isText() || desc.isDateTime())
+								{
+									if (desc.dsc_dtype == dtype_text)
+									{
+										const char* const pad = (desc.dsc_sub_type == ttype_binary) ? "\0": " ";
+										value.rtrim(pad);
+									}
+
+									if (desc.isText() && desc.getTextType() == ttype_binary)
+									{
+										string hex;
+										char* s = hex.getBuffer(2 * len);
+										for (int i = 0; i < len; i++)
+										{
+											sprintf(s, "%02X", (int) (unsigned char) str[i]);
+											s += 2;
+										}
+										value = "x'" + hex + "'";
+									}
+									else
+									{
+										value = "'" + value + "'";
+									}
+								}
+
+								if (value.length() > MAX_KEY_STRING_LEN)
+								{
+									fb_assert(desc.isText());
+
+									value.resize(MAX_KEY_STRING_LEN);
+
+									const CharSet* const cs = INTL_charset_lookup(tdbb, desc.getCharSet());
+
+									while (value.hasData() && !cs->wellFormed(value.length(), (const UCHAR*) value.c_str()))
+										value.resize(value.length() - 1);
+
+									value += "...";
+								}
+
+								const string error2 = "Problematic field value is " + value;
+
+								Arg::StatusVector statusVector(ex);
+								statusVector.append(Arg::Gds(isc_random) << Arg::Str(error1));
+								statusVector.append(Arg::Gds(isc_random) << Arg::Str(error2));
+								statusVector.copyTo(&localStatus);
+							}
+						}
+
+						if (!localStatus.isSuccess())
+							break;
+					}
+
+					if (!localStatus.isSuccess())
+						break;
+				}
+
+				// Cleanup
+
+				for (CheckFieldDatatype* iter = fields.begin(); iter != fields.end(); ++iter)
+				{
+					delete iter->value.vlu_string;
+
+					if (iter->value.vlu_blob)
+						iter->value.vlu_blob->BLB_close(tdbb);
+				}
+
+				delete rpb.rpb_record;
+
+				localStatus.check();
+			}
+			END_FOR
 		}
 
 		break;

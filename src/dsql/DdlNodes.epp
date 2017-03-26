@@ -4306,9 +4306,11 @@ void CreateDomainNode::execute(thread_db* tdbb, DsqlCompilerScratch* dsqlScratch
 // This function throws an exception if the conversion can not be made.
 //
 // ASF: We should stop using dyn_fld here as soon DYN stops to be a caller of this function.
-void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
+void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld,
+								  const MetaName& fieldName, jrd_tra* transaction)
 {
 	ULONG errorCode = FB_SUCCESS;
+	bool runtimeCheck = false;
 
 	const USHORT origLen = DTYPE_IS_TEXT(origFld.dyn_dsc.dsc_dtype) ?
 		origFld.dyn_charlen : DSC_string_length(&origFld.dyn_dsc);
@@ -4340,6 +4342,7 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 		case blr_float:
 			// Cannot convert column %s from character to non-character data.
 			errorCode = isc_dyn_dtype_conv_invalid;
+			runtimeCheck = true;
 			break;
 
 		// If the original field is a character field and the new field is a character field,
@@ -4351,6 +4354,7 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			{
 				// msg 208: New size specified for column %s must be at least %d characters.
 				errorCode = isc_dyn_char_fld_too_small;
+				runtimeCheck = true;
 			}
 			break;
 
@@ -4411,6 +4415,7 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			{
 				// msg 208: New size specified for column %s must be at least %d characters.
 				errorCode = isc_dyn_char_fld_too_small;
+				runtimeCheck = true;
 			}
 			break;
 
@@ -4452,11 +4457,13 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			{
 			case blr_short:
 				errorCode = checkUpdateNumericType(origFld, newFld);
+				runtimeCheck = true;
 				break;
 
 			default:
 				// Cannot change datatype for column %s.  Conversion from base type %s to base type %s is not supported.
 				errorCode = isc_dyn_invalid_dtype_conversion;
+				runtimeCheck = true;
 				break;
 			}
 			break;
@@ -4467,11 +4474,13 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			case blr_long:
 			case blr_short:
 				errorCode = checkUpdateNumericType(origFld, newFld);
+				runtimeCheck = true;
 				break;
 
 			default:
 				// Cannot change datatype for column %s.  Conversion from base type %s to base type %s is not supported.
 				errorCode = isc_dyn_invalid_dtype_conversion;
+				runtimeCheck = true;
 				break;
 			}
 			break;
@@ -4497,11 +4506,13 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			case blr_long:
 			case blr_short:
 				errorCode = checkUpdateNumericType(origFld, newFld);
+				runtimeCheck = true;
 				break;
 
 			default:
 				// Cannot change datatype for column %s.  Conversion from base type %s to base type %s is not supported.
 				errorCode = isc_dyn_invalid_dtype_conversion;
+				runtimeCheck = true;
 				break;
 			}
 			break;
@@ -4520,6 +4531,7 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			default:
 				// Cannot change datatype for column %s.  Conversion from base type %s to base type %s is not supported.
 				errorCode = isc_dyn_invalid_dtype_conversion;
+				runtimeCheck = true;
 				break;
 			}
 			break;
@@ -4533,6 +4545,7 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 			{
 				// msg 208: New size specified for column %s must be at least %d characters.
 				errorCode = isc_dyn_char_fld_too_small;
+				runtimeCheck = true;
 			}
 			break;
 
@@ -4578,6 +4591,12 @@ void AlterDomainNode::checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld)
 
 	if (errorCode == FB_SUCCESS)
 		return;
+
+	if (runtimeCheck)
+	{
+		DFW_post_work(transaction, dfw_check_datatype, fieldName.c_str(), 0);
+		return;
+	}
 
 	switch (errorCode)
 	{
@@ -4936,7 +4955,7 @@ void AlterDomainNode::execute(thread_db* tdbb, DsqlCompilerScratch* dsqlScratch,
 				// Now that we have all of the information needed, let's check to see if the field
 				// type can be modifed.
 
-				checkUpdate(origDom, newDom);
+				checkUpdate(origDom, newDom, name, transaction);
 
 				if (!newDom.dyn_dsc.isExact() || newDom.dyn_dsc.dsc_scale != 0)
 				{
@@ -7879,7 +7898,7 @@ void AlterRelationNode::modifyField(thread_db* tdbb, DsqlCompilerScratch* dsqlSc
 						newDom.dyn_fld_source = newDomainName;
 
 					AlterDomainNode::getDomainType(tdbb, transaction, newDom);
-					AlterDomainNode::checkUpdate(origDom, newDom);
+					AlterDomainNode::checkUpdate(origDom, newDom, newDom.dyn_fld_source, transaction);
 
 					if (!RFR.RDB$GENERATOR_NAME.NULL)
 					{

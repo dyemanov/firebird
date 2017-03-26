@@ -879,7 +879,8 @@ public:
 	}
 
 public:
-	static void checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld);
+	static void checkUpdate(const dyn_fld& origFld, const dyn_fld& newFld,
+		const Firebird::MetaName& fieldName, jrd_tra* transaction);
 	static ULONG checkUpdateNumericType(const dyn_fld& origFld, const dyn_fld& newFld);
 	static void getDomainType(thread_db* tdbb, jrd_tra* transaction, dyn_fld& dynFld);
 	static void modifyLocalFieldIndex(thread_db* tdbb, jrd_tra* transaction,

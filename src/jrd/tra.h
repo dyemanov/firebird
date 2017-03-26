@@ -516,6 +516,10 @@ enum dfw_t {
 	dfw_check_not_null,
 	dfw_store_view_context_type,
 	dfw_set_generator,
+	dfw_db_crypt,			// change database encryption status
+	dfw_set_linger,			// set database linger
+	dfw_clear_mapping,		// clear user mapping cache
+	dfw_check_datatype,		// validate field values to fit the new datatype
 
 	// deferred works argument types
 	dfw_arg_index_name,		// index name for dfw_delete_expression_index, mandatory
@@ -526,10 +530,7 @@ enum dfw_t {
 	dfw_arg_rel_name,		// relation name of a trigger
 	dfw_arg_trg_type,		// trigger type
 	dfw_arg_new_name,		// new name
-	dfw_arg_field_not_null,	// set domain to not nullable
-	dfw_db_crypt,			// change database encryption status
-	dfw_set_linger,			// set database linger
-	dfw_clear_mapping		// clear user mapping cache
+	dfw_arg_field_not_null	// set domain to not nullable
 };
 
 // Verb actions
