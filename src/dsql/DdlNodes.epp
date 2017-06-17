@@ -390,26 +390,8 @@ void defineComputed(DsqlCompilerScratch* dsqlScratch, RelationSourceNode* relati
 			field->subType = desc.dsc_sub_type;
 	}
 
-	if (field && field->precision == 0 && field->scale != 0)
-	{
-		switch (field->dtype)
-		{
-			case dtype_short:
-				field->precision = 4;
-				break;
-
-			case dtype_long:
-				field->precision = 9;
-				break;
-
-			case dtype_int64:
-				field->precision = 18;
-				break;
-
-			default:
-				fb_assert(!DTYPE_IS_EXACT(field->dtype));
-		}
-	}
+	if (field)
+		field->setExactPrecision();
 
 	dsqlScratch->resetContextStack();
 
@@ -1993,9 +1975,11 @@ void CreateAlterFunctionNode::storeArgument(thread_db* tdbb, DsqlCompilerScratch
 		ARG.RDB$MECHANISM.NULL = TRUE;
 		ARG.RDB$FIELD_TYPE.NULL = TRUE;
 		ARG.RDB$FIELD_LENGTH.NULL = TRUE;
+		ARG.RDB$FIELD_SUB_TYPE.NULL = TRUE;
 		ARG.RDB$FIELD_PRECISION.NULL = TRUE;
 		ARG.RDB$FIELD_SCALE.NULL = TRUE;
 		ARG.RDB$CHARACTER_SET_ID.NULL = TRUE;
+		ARG.RDB$CHARACTER_LENGTH.NULL = TRUE;
 		ARG.RDB$COLLATION_ID.NULL = TRUE;
 		ARG.RDB$ARGUMENT_MECHANISM.NULL = TRUE;
 
@@ -8719,6 +8703,8 @@ void CreateAlterViewNode::execute(thread_db* tdbb, DsqlCompilerScratch* dsqlScra
 			}
 			else
 				newField.subType = desc.dsc_sub_type;
+
+			newField.setExactPrecision();
 
 			if (relField)	// modifying a view
 			{

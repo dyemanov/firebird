@@ -247,7 +247,7 @@ void TRA_cleanup(thread_db* tdbb)
 		window.win_page = inventory_page(tdbb, sequence);
 		tx_inv_page* tip = (tx_inv_page*) CCH_FETCH(tdbb, &window, LCK_write, pag_transactions);
 		TraNumber max = ceiling - (TraNumber) sequence * trans_per_tip;
-		if (max > trans_per_tip)
+		if (max >= trans_per_tip)
 			max = trans_per_tip - 1;
 		for (; number <= max; number++)
 		{
@@ -820,20 +820,31 @@ void TRA_update_counters(thread_db* tdbb, Database* dbb)
 	WIN window(HEADER_PAGE_NUMBER);
 	header_page* header = (header_page*)CCH_FETCH(tdbb, &window, LCK_write, pag_header);
 
-	if (dbb->dbb_oldest_active > header->hdr_oldest_active ||
-		dbb->dbb_oldest_transaction > header->hdr_oldest_transaction ||
-		dbb->dbb_oldest_snapshot > header->hdr_oldest_snapshot)
+	const TraNumber next_transaction = Ods::getNT(header);
+	const TraNumber oldest_transaction = Ods::getOIT(header);
+	const TraNumber oldest_active = Ods::getOAT(header);
+	const TraNumber oldest_snapshot = Ods::getOST(header);
+
+	fb_assert(dbb->dbb_next_transaction <= next_transaction);
+
+	if (dbb->dbb_oldest_active > oldest_active ||
+		dbb->dbb_oldest_transaction > oldest_transaction ||
+		dbb->dbb_oldest_snapshot > oldest_snapshot ||
+		dbb->dbb_next_transaction > next_transaction)
 	{
 		CCH_MARK_MUST_WRITE(tdbb, &window);
 
 		if (dbb->dbb_oldest_active > header->hdr_oldest_active)
-			header->hdr_oldest_active = dbb->dbb_oldest_active;
+			Ods::writeOAT(header, dbb->dbb_oldest_active);
 
 		if (dbb->dbb_oldest_transaction > header->hdr_oldest_transaction)
-			header->hdr_oldest_transaction = dbb->dbb_oldest_transaction;
+			Ods::writeOIT(header, dbb->dbb_oldest_transaction);
 
 		if (dbb->dbb_oldest_snapshot > header->hdr_oldest_snapshot)
-			header->hdr_oldest_snapshot = dbb->dbb_oldest_snapshot;
+			Ods::writeOST(header, dbb->dbb_oldest_snapshot);
+
+		if (dbb->dbb_next_transaction > next_transaction)
+			Ods::writeNT(header, dbb->dbb_next_transaction);
 	}
 
 	CCH_RELEASE(tdbb, &window);
@@ -1280,7 +1291,7 @@ void TRA_release_transaction(thread_db* tdbb, jrd_tra* transaction, Jrd::TraceTr
 	// Release the transaction and its pool
 
 	tdbb->setTransaction(NULL);
-	JTransaction* jTra = transaction->getInterface();
+	JTransaction* jTra = transaction->getInterface(true);	// ASF: maybe it's better to pass false?
 	if (jTra)
 	{
 		jTra->setHandle(NULL);
@@ -3500,9 +3511,9 @@ jrd_tra::~jrd_tra()
 }
 
 
-JTransaction* jrd_tra::getInterface()
+JTransaction* jrd_tra::getInterface(bool create)
 {
-	if (!tra_interface)
+	if (!tra_interface && create)
 	{
 		tra_flags |= TRA_own_interface;
 		tra_interface = FB_NEW JTransaction(this, tra_attachment->getStable());

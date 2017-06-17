@@ -8520,7 +8520,8 @@ static bool stdin_redirected()
 {
 #ifdef WIN_NT
 	HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
-	if (GetFileType(in) == FILE_TYPE_CHAR) //FILE_TYPE_DISK)
+	const DWORD file_type = GetFileType(in);
+	if (file_type == FILE_TYPE_CHAR || file_type == FILE_TYPE_PIPE)
 		return false;
 #else
 	if (isatty(fileno(stdin)))

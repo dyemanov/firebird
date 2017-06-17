@@ -230,6 +230,31 @@ public:
 	}
 
 public:
+	void setExactPrecision()
+	{
+		if (precision != 0)
+			return;
+
+		switch (dtype)
+		{
+			case dtype_short:
+				precision = 4;
+				break;
+
+			case dtype_long:
+				precision = 9;
+				break;
+
+			case dtype_int64:
+				precision = 18;
+				break;
+
+			default:
+				fb_assert(!DTYPE_IS_EXACT(dtype));
+		}
+	}
+
+public:
 	USHORT dtype;
 	FLD_LENGTH length;
 	SSHORT scale;

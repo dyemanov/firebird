@@ -4201,9 +4201,17 @@ JTransaction* JAttachment::startTransaction(CheckStatusWrapper* user_status,
 
 	successful_completion(user_status);
 
-	JTransaction* jt = FB_NEW JTransaction(tra, getStable());
-	tra->setInterface(jt);
-	jt->addRef();
+	JTransaction* jt = tra->getInterface(false);
+
+	if (jt)
+		tra->tra_flags &= ~TRA_own_interface;
+	else
+	{
+		jt = FB_NEW JTransaction(tra, getStable());
+		tra->setInterface(jt);
+		jt->addRef();
+	}
+
 	return jt;
 }
 

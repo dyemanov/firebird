@@ -5506,11 +5506,8 @@ void MessageNode::setup(thread_db* tdbb, CompilerScratch* csb, USHORT message, U
 		// So we only check even indexes, which is the actual parameter.
 		if (itemInfo.isSpecial() && index % 2 == 0)
 		{
-			csb->csb_dbg_info->argInfoToName.get(
-				ArgumentInfo(csb->csb_msg_number, index / 2), itemInfo.name);
-
-			csb->csb_map_item_info.put(Item(Item::TYPE_PARAMETER, csb->csb_msg_number, index),
-				itemInfo);
+			csb->csb_dbg_info->argInfoToName.get(ArgumentInfo(csb->csb_msg_number, index / 2), itemInfo.name);
+			csb->csb_map_item_info.put(Item(Item::TYPE_PARAMETER, message, index), itemInfo);
 		}
 	}
 

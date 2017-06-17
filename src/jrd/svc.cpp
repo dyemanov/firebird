@@ -567,8 +567,7 @@ unsigned int Service::getAuthBlock(const unsigned char** bytes)
 
 void Service::fillDpb(ClumpletWriter& dpb)
 {
-	const char* providers = "Providers=" CURRENT_ENGINE;
-	dpb.insertString(isc_dpb_config, providers, fb_strlen(providers));
+	dpb.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
 	if (svc_address_path.hasData())
 	{
 		dpb.insertString(isc_dpb_address_path, svc_address_path);

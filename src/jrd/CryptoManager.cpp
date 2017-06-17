@@ -818,7 +818,7 @@ namespace Jrd {
 				if (!down)
 				{
 				RefPtr<JAttachment> jAtt(REF_NO_INCR, dbb.dbb_provider->attachDatabase(&status_vector,
-					dbb.dbb_filename.c_str(), writer.getBufferLength(), writer.getBuffer()));
+					dbb.dbb_database_name.c_str(), writer.getBufferLength(), writer.getBuffer()));
 				check(&status_vector);
 
 				MutexLockGuard attGuard(*(jAtt->getStable()->getMutex()), FB_FUNCTION);
