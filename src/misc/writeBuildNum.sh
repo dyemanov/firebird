@@ -18,8 +18,6 @@ cd $NowAt
 Root=`dirname $Root`
 Root=`dirname $Root`
 
-SPECIAL_BUILD_SUFFIX="Custom"
-
 if [ "$SPECIAL_BUILD_SUFFIX" = "" ]; then
 # Normal builds
 SuffixKind=""
