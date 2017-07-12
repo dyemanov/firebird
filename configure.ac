@@ -97,6 +97,7 @@ case "$build" in
     SHRLIB_EXT=dylib
     CPU_TYPE=x86_64
     EXPORT_SYMBOLS_STYLE=darwin
+    RAW_DEVICES_FLG=N
     ;;
 
   i*86-*-darwin*)
@@ -110,6 +111,7 @@ case "$build" in
     SHRLIB_EXT=dylib
     CPU_TYPE=i386
     EXPORT_SYMBOLS_STYLE=darwin
+    RAW_DEVICES_FLG=N
     ;;
 
   powerpc-*-darwin*)

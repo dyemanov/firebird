@@ -28,7 +28,7 @@
 #include "firebird.h"
 
 #include "../common/os/mod_loader.h"
-#include "../../common.h"
+#include "../common/os/path_utils.h"
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,8 +42,9 @@
 class DlfcnModule : public ModuleLoader::Module
 {
 public:
-	DlfcnModule(void* m)
-		: module(m)
+	DlfcnModule(MemoryPool& pool, const Firebird::PathName& aFileName, void* m)
+		: ModuleLoader::Module(pool, aFileName),
+	 	module(m)
 	{}
 
 	~DlfcnModule();
@@ -97,7 +98,7 @@ ModuleLoader::Module* ModuleLoader::loadModule(const Firebird::PathName& modPath
 		return 0;
 	}
 
-	return FB_NEW_POOL(*getDefaultMemoryPool()) DlfcnModule(module);
+	return FB_NEW_POOL(*getDefaultMemoryPool()) DlfcnModule(*getDefaultMemoryPool(), modPath, module);
 }
 
 

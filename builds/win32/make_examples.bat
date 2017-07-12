@@ -23,13 +23,19 @@
 @echo.
 @echo Building %FB_OBJ_DIR%
 if "%VS_VER%"=="msvc6" (
-    @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird2 examples_%FB_TARGET_PLATFORM%.log empbuild intlbld
+  @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird2 examples_%FB_TARGET_PLATFORM%.log empbuild intlbld
 ) else (
-    @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird3_Examples empbuild_%FB_TARGET_PLATFORM%.log empbuild
-    @if defined FB2_INTLEMP (
-      @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird3_Examples intlbuild_%FB_TARGET_PLATFORM%.log intlbuild
-    )
+  @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird3_Examples empbuild_%FB_TARGET_PLATFORM%.log empbuild
+  @if defined FB2_INTLEMP (
+    @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird3_Examples intlbuild_%FB_TARGET_PLATFORM%.log intlbuild
+  )
+  if defined BUILD_UDRCPP_EXAMPLE (
     @call compile.bat %FB_ROOT_PATH%\builds\win32\%VS_VER%\Firebird3_Examples udrcpp_example_%FB_TARGET_PLATFORM%.log udrcpp_example
+    if errorlevel 1 ( 
+      @call :ERROR building udrcpp example failed - see make_examples_%FB_TARGET_PLATFORM%.log for details 
+      @goto :EOF 
+    )
+  )
 )
 @echo.
 @call :MOVE
@@ -144,7 +150,7 @@ if defined FB2_INTLEMP (
 if errorlevel 44 (call :ERROR empbuild.exe failed - see %~n0.log for details & goto :EOF)
 
 @if defined FB2_INTLEMP (
-@echo Building intlemp.fdb
+  @echo Building intlemp.fdb
   @del %FB_GEN_DIR%\examples\intlemp.fdb 2>nul
   @del isql.tmp 2>nul
   @echo s;intlemp.fdb;%SERVER_NAME%:%FB_GEN_DIR%\examples\intlemp.fdb;g > isql.tmp
@@ -162,7 +168,7 @@ if errorlevel 44 (call :ERROR empbuild.exe failed - see %~n0.log for details & g
 
 if defined FB2_INTLEMP (
   if exist %FB_GEN_DIR%\examples\intlemp.fdb (
-  @copy %FB_GEN_DIR%\examples\intlemp.fdb %FB_OUTPUT_DIR%\examples\empbuild\ > nul
+    @copy %FB_GEN_DIR%\examples\intlemp.fdb %FB_OUTPUT_DIR%\examples\empbuild\ > nul
   )
 )
 

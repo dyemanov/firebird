@@ -7923,6 +7923,7 @@ static unsigned process_message_display(Firebird::IMessageMetadata* message, uns
 			namelength = NULL_DISP_LEN;
 
 		const unsigned type = var.type;
+		const SSHORT charSet = TTYPE_TO_CHARSET(var.charSet);
 
 		switch (type)
 		{
@@ -7954,22 +7955,22 @@ static unsigned process_message_display(Firebird::IMessageMetadata* message, uns
 			alignment = 1;
 			data_length++;
 			// OCTETS data is displayed in hex
-			if (var.charSet == CS_BINARY)
+			if (charSet == CS_BINARY)
 				disp_length = 2 * var.length;
-			else if (var.charSet == CS_UNICODE_FSS)
+			else if (charSet == CS_UNICODE_FSS)
 				disp_length /= 3;
-			else if (var.charSet == CS_UTF8)
+			else if (charSet == CS_UTF8)
 				disp_length /= 4;
 			break;
 		case SQL_VARYING:
 			data_length += sizeof(USHORT) + 1;
 			alignment = sizeof(USHORT);
 			// OCTETS data is displayed in hex
-			if (var.charSet == CS_BINARY)
+			if (charSet == CS_BINARY)
 				disp_length = 2 * var.length;
-			else if (var.charSet == CS_UNICODE_FSS)
+			else if (charSet == CS_UNICODE_FSS)
 				disp_length /= 3;
-			else if (var.charSet == CS_UTF8)
+			else if (charSet == CS_UTF8)
 				disp_length /= 4;
 			break;
 		case SQL_SHORT:
@@ -8011,7 +8012,7 @@ static unsigned process_message_display(Firebird::IMessageMetadata* message, uns
 				pad[i] = setValues.global_Col_default;
 			disp_length = pad[i];
 
-			if (var.charSet == 4)
+			if (charSet == 4)
 				disp_length *= 4;
 		}
 

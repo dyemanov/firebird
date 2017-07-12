@@ -4136,7 +4136,8 @@ bool VIO_writelock(thread_db* tdbb, record_param* org_rpb, jrd_tra* transaction)
 	org_rpb->rpb_b_line = temp.rpb_line;
 	org_rpb->rpb_address = new_rpb.rpb_address;
 	org_rpb->rpb_length = new_rpb.rpb_length;
-	org_rpb->rpb_flags |= rpb_delta;
+	org_rpb->rpb_flags &= ~(rpb_delta | rpb_uk_modified);
+	org_rpb->rpb_flags |= new_rpb.rpb_flags & rpb_delta;
 
 	replace_record(tdbb, org_rpb, &stack, transaction);
 

@@ -88,7 +88,7 @@
 #ifndef FB_PLATFORM
 #define FB_PLATFORM	"S3"
 #endif
-#endif // __sun
+#endif /* __sun */
 
 #ifdef AIX
 #ifdef AIX_PPC
@@ -96,7 +96,7 @@
 #else
 #define FB_PLATFORM	"IA"
 #endif
-#endif // aix
+#endif /* aix */
 
 #ifdef WIN_NT
 #ifdef i386
@@ -144,4 +144,4 @@
 #define ISC_VERSION		FB_PLATFORM "-" FB_BUILD_TYPE ISC_MAJOR_VER "." ISC_MINOR_VER "." FB_REV_NO "." FB_BUILD_NO " " FB_BUILD_SUFFIX
 #endif
 
-#endif // JRD_LICENSE_H
+#endif /* JRD_LICENSE_H */
