@@ -127,7 +127,8 @@ extern:
 	$(MAKE) -C $(ROOT)/extern/cloop TARGET=release WITH_FPC=0 BUILD_DIR=$(TMP_ROOT)/cloop OUT_DIR=$(GEN_ROOT)/$(TARGET)/cloop
 
 ifeq ($(TOMBUILD_FLG),Y)
-	$(MAKE) -C $(ROOT)/extern/libtommath -f makefile.shared
+	echo $(LIBTOOL)
+	$(MAKE) -C $(ROOT)/extern/libtommath -f makefile.shared LIBTOOL=$(LIBTOOL)
 	ln -sf $(TOMMATH_SO).$(TOMMATH_VER) $(LIB)
 	ln -sf $(TOMMATH_SO) $(LIB)
 endif
@@ -732,4 +733,3 @@ clean_yacc_gen:
 
 #___________________________________________________________________________
 # Extra platform specific targets
-@POSTFIX_INCLUDE@

@@ -144,9 +144,12 @@ namespace
 
 	struct Signature
 	{
+		const static unsigned FLAG_DETERMINISTIC = 0x01;
+
 		Signature(MemoryPool& p, const MetaName& aName)
 			: name(p, aName),
 			  parameters(p),
+			  flags(0),
 			  defined(false)
 		{
 		}
@@ -154,6 +157,7 @@ namespace
 		explicit Signature(const MetaName& aName)
 			: name(aName),
 			  parameters(*getDefaultMemoryPool()),
+			  flags(0),
 			  defined(false)
 		{
 		}
@@ -161,6 +165,7 @@ namespace
 		explicit Signature(MemoryPool& p)
 			: name(p),
 			  parameters(p),
+			  flags(0),
 			  defined(false)
 		{
 		}
@@ -168,6 +173,7 @@ namespace
 		Signature(MemoryPool& p, const Signature& o)
 			: name(p, o.name),
 			  parameters(p),
+			  flags(o.flags),
 			  defined(o.defined)
 		{
 			for (SortedObjectsArray<ParameterInfo>::const_iterator i = o.parameters.begin();
@@ -184,7 +190,7 @@ namespace
 
 		bool operator ==(const Signature& o) const
 		{
-			if (name != o.name || parameters.getCount() != o.parameters.getCount())
+			if (name != o.name || flags != o.flags || parameters.getCount() != o.parameters.getCount())
 				return false;
 
 			for (SortedObjectsArray<ParameterInfo>::const_iterator i = parameters.begin(),
@@ -205,6 +211,7 @@ namespace
 
 		MetaName name;
 		SortedObjectsArray<ParameterInfo> parameters;
+		unsigned flags;
 		bool defined;
 	};
 
@@ -224,6 +231,9 @@ namespace
 		{
 			Signature function(FUN.RDB$FUNCTION_NAME);
 			function.defined = !FUN.RDB$FUNCTION_BLR.NULL || !FUN.RDB$ENTRYPOINT.NULL;
+
+			if (!FUN.RDB$DETERMINISTIC_FLAG.NULL && FUN.RDB$DETERMINISTIC_FLAG != 0)
+				function.flags |= Signature::FLAG_DETERMINISTIC;
 
 			if (details)
 			{

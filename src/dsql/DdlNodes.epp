@@ -10189,7 +10189,7 @@ void MappingNode::runInSecurityDb(SecDbContext* secDbContext)
 
 			// check presence of such record in the table
 			Message msgCheck;
-			Field<Varying> nm(msgCheck, 1);
+			Field<Varying> nm(msgCheck, MAX_SQL_IDENTIFIER_LEN);
 			nm = name.c_str();
 
 			Message result;

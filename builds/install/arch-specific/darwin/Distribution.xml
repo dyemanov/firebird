@@ -3,6 +3,7 @@
     <title>Firebird Database Server</title>
     <welcome file="Welcome.txt" mime-type="text/plain"/>
     <license file="License.txt" mime-type="text/plain"/>
+    <readme file="Readme.txt" mime-type="text/plain"/>
     <pkg-ref id="com.firebirdsql.Firebird"/>
     <options customize="never" require-scripts="false"/>
     <choices-outline>

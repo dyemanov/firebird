@@ -458,6 +458,7 @@ type
 	ITraceTransaction_getPerfPtr = function(this: ITraceTransaction): PerformanceInfoPtr; cdecl;
 	ITraceParams_getCountPtr = function(this: ITraceParams): Cardinal; cdecl;
 	ITraceParams_getParamPtr = function(this: ITraceParams; idx: Cardinal): dscPtr; cdecl;
+	ITraceParams_getTextUTF8Ptr = function(this: ITraceParams; status: IStatus; idx: Cardinal): PAnsiChar; cdecl;
 	ITraceStatement_getStmtIDPtr = function(this: ITraceStatement): Int64; cdecl;
 	ITraceStatement_getPerfPtr = function(this: ITraceStatement): PerformanceInfoPtr; cdecl;
 	ITraceSQLStatement_getTextPtr = function(this: ITraceSQLStatement): PAnsiChar; cdecl;
@@ -2492,13 +2493,15 @@ type
 	TraceParamsVTable = class(VersionedVTable)
 		getCount: ITraceParams_getCountPtr;
 		getParam: ITraceParams_getParamPtr;
+		getTextUTF8: ITraceParams_getTextUTF8Ptr;
 	end;
 
 	ITraceParams = class(IVersioned)
-		const VERSION = 2;
+		const VERSION = 3;
 
 		function getCount(): Cardinal;
 		function getParam(idx: Cardinal): dscPtr;
+		function getTextUTF8(status: IStatus; idx: Cardinal): PAnsiChar;
 	end;
 
 	ITraceParamsImpl = class(ITraceParams)
@@ -2506,6 +2509,7 @@ type
 
 		function getCount(): Cardinal; virtual; abstract;
 		function getParam(idx: Cardinal): dscPtr; virtual; abstract;
+		function getTextUTF8(status: IStatus; idx: Cardinal): PAnsiChar; virtual; abstract;
 	end;
 
 	TraceStatementVTable = class(VersionedVTable)
@@ -3151,6 +3155,9 @@ const
 	isc_dpb_address = byte(1);
 	isc_dpb_addr_protocol = byte(1);
 	isc_dpb_addr_endpoint = byte(2);
+	isc_dpb_addr_flags = byte(3);
+	isc_dpb_addr_flag_conn_compressed = $01;
+	isc_dpb_addr_flag_conn_encrypted = $02;
 	isc_dpb_pages = byte(1);
 	isc_dpb_records = byte(2);
 	isc_dpb_indices = byte(4);
@@ -6497,6 +6504,12 @@ end;
 function ITraceParams.getParam(idx: Cardinal): dscPtr;
 begin
 	Result := TraceParamsVTable(vTable).getParam(Self, idx);
+end;
+
+function ITraceParams.getTextUTF8(status: IStatus; idx: Cardinal): PAnsiChar;
+begin
+	Result := TraceParamsVTable(vTable).getTextUTF8(Self, status, idx);
+	FbException.checkException(status);
 end;
 
 function ITraceStatement.getStmtID(): Int64;
@@ -11134,6 +11147,15 @@ begin
 	end
 end;
 
+function ITraceParamsImpl_getTextUTF8Dispatcher(this: ITraceParams; status: IStatus; idx: Cardinal): PAnsiChar; cdecl;
+begin
+	try
+		Result := ITraceParamsImpl(this).getTextUTF8(status, idx);
+	except
+		on e: Exception do FbException.catchException(status, e);
+	end
+end;
+
 var
 	ITraceParamsImpl_vTable: TraceParamsVTable;
 
@@ -12886,9 +12908,10 @@ initialization
 	ITraceTransactionImpl_vTable.getPerf := @ITraceTransactionImpl_getPerfDispatcher;
 
 	ITraceParamsImpl_vTable := TraceParamsVTable.create;
-	ITraceParamsImpl_vTable.version := 2;
+	ITraceParamsImpl_vTable.version := 3;
 	ITraceParamsImpl_vTable.getCount := @ITraceParamsImpl_getCountDispatcher;
 	ITraceParamsImpl_vTable.getParam := @ITraceParamsImpl_getParamDispatcher;
+	ITraceParamsImpl_vTable.getTextUTF8 := @ITraceParamsImpl_getTextUTF8Dispatcher;
 
 	ITraceStatementImpl_vTable := TraceStatementVTable.create;
 	ITraceStatementImpl_vTable.version := 2;

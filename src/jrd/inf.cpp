@@ -769,6 +769,10 @@ void INF_database_info(thread_db* tdbb,
 				dbb->dbb_crypto_manager->getCurrentState() : 0, buffer);
 			break;
 
+		case fb_info_conn_flags:
+			length = INF_convert(tdbb->getAttachment()->att_remote_flags, buffer);
+			break;
+
 		default:
 			buffer[0] = item;
 			item = isc_info_error;

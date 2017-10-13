@@ -2,8 +2,6 @@ The Firebird install process will create a new user: firebird. This is for added
 
 All the standard command line executables are installed in /Library/Frameworks/Firebird.framework/Resources/bin. If you are interested in helping with the Firebird Project please contact us via the Firebird website at www.firebirdsql.org.
 
-Please note that every MacOS X user you want to have access to your database MUST have read/write permissions on the .fdb file.
-
 The release notes can be found in the doc directory  Generic documentation for Firebird can be found on www.firebirdsql.org and the IBPhoenix web site at www.ibphoenix.com. There is a Yahoo group named "ib-support" if you have any problems with Firebird.
 
 Thanks to:

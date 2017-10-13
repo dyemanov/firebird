@@ -3,7 +3,11 @@
 #Tom St Denis
 VERSION=0:41
 
-CC = libtool --mode=compile --tag=CC gcc
+ifndef LIBTOOL
+LIBTOOL=libtool
+endif
+
+CC = $(LIBTOOL) --mode=compile --tag=CC gcc
 
 CFLAGS  +=  -I./ -Wall -W -Wshadow -Wsign-compare
 
@@ -83,17 +87,17 @@ bn_mp_to_signed_bin_n.o bn_mp_to_unsigned_bin_n.o
 objs: $(OBJECTS)
 
 $(LIBNAME):  $(OBJECTS)
-	libtool --mode=link --tag=CC gcc *.lo -o $(LIBNAME) -rpath $(LIBPATH) -version-info $(VERSION)
+	$(LIBTOOL) --mode=link --tag=CC gcc *.lo -o $(LIBNAME) -rpath $(LIBPATH) -version-info $(VERSION)
 
 install: $(LIBNAME)
 	install -d -g $(GROUP) -o $(USER) $(DESTDIR)$(LIBPATH)
-	libtool --mode=install install -c $(LIBNAME) $(DESTDIR)$(LIBPATH)/$(LIBNAME)
+	$(LIBTOOL) --mode=install install -c $(LIBNAME) $(DESTDIR)$(LIBPATH)/$(LIBNAME)
 	install -d -g $(GROUP) -o $(USER) $(DESTDIR)$(INCPATH)
 	install -g $(GROUP) -o $(USER) $(HEADERS) $(DESTDIR)$(INCPATH)
 
 test: $(LIBNAME) demo/demo.o
 	gcc $(CFLAGS) -c demo/demo.c -o demo/demo.o
-	libtool --mode=link gcc -o test demo/demo.o $(LIBNAME_S)
+	$(LIBTOOL) --mode=link gcc -o test demo/demo.o $(LIBNAME_S)
 	
 mtest: test	
 	cd mtest ; gcc $(CFLAGS) mtest.c -o mtest

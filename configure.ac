@@ -922,8 +922,15 @@ AC_COMPILE_IFELSE(
 	AC_DEFINE(HAVE_AO_COMPARE_AND_SWAP_FULL, 1, [Define this if AO_compare_and_swap_full() is defined in atomic_ops.h]))
 
 dnl Check for time function
-AC_SEARCH_LIBS(clock_gettime, rt)
-AC_CHECK_FUNCS(clock_gettime)
+case $host in
+        *-darwin*)
+                ac_cv_func_clock_gettime=no
+                ;;
+        *)
+		AC_SEARCH_LIBS(clock_gettime, rt)
+                AC_CHECK_FUNCS(clock_gettime)
+                ;;
+esac
 
 dnl Checks for pthread functions
 AC_CHECK_FUNCS(pthread_mutexattr_setprotocol)

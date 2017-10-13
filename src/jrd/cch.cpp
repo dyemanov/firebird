@@ -1711,14 +1711,19 @@ bool set_diff_page(thread_db* tdbb, BufferDesc* bdb)
 		return true;
 
 	// Take backup state lock
-	const AtomicCounter::counter_type oldFlags = bdb->bdb_flags.exchangeBitOr(BDB_nbak_state_lock);
-	if (!(oldFlags & BDB_nbak_state_lock))
+	if (!(tdbb->tdbb_flags & TDBB_backup_write_locked))
 	{
-		NBAK_TRACE(("lock state for dirty page %d:%06d",
-			bdb->bdb_page.getPageSpaceID(), bdb->bdb_page.getPageNum()));
+		const AtomicCounter::counter_type oldFlags = bdb->bdb_flags.exchangeBitOr(BDB_nbak_state_lock);
+		if (!(oldFlags & BDB_nbak_state_lock))
+		{
+			NBAK_TRACE(("lock state for dirty page %d:%06d",
+				bdb->bdb_page.getPageSpaceID(), bdb->bdb_page.getPageNum()));
 
-		bm->lockStateRead(tdbb, LCK_WAIT);
+			bm->lockStateRead(tdbb, LCK_WAIT);
+		}
 	}
+	else
+		fb_assert(bdb->bdb_page == HEADER_PAGE_NUMBER);
 
 	if (bdb->bdb_page != HEADER_PAGE_NUMBER)
 	{

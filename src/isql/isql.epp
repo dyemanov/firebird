@@ -6894,7 +6894,7 @@ static bool checkSpecial(TEXT* const p, const int length, const double value)
 	if (isnan(value))
 		t = "NaN";
 	else if (isinf(value))
-		t = "Infinity";
+		t = Firebird::isNegativeInf(value) ? "-Infinity" : "Infinity";
 	else
 		return false;
 

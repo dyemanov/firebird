@@ -142,6 +142,8 @@ enum db_info_types
 
 	fb_info_crypt_state = 126,
 
+    fb_info_conn_flags = 132,
+
 	isc_info_db_last_value   /* Leave this LAST! */
 };
 

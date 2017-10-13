@@ -2929,6 +2929,7 @@ rec_type get_data(BurpGlobals* tdgbl, burp_rel* relation, bool skip_relation)
 
 	ULONG records = 0;
 	rec_type record;
+	bool resync = false;
 
 	while (true)
 	{
@@ -3020,10 +3021,12 @@ rec_type get_data(BurpGlobals* tdgbl, burp_rel* relation, bool skip_relation)
 
 		// ASF: Preferable we should call isc_start_and_send only when records == 1, but this leaks
 		// memory when there are blobs and arrays fields - CORE-3802.
-		if (records % 1000 == 1)
+		if (resync || records % 1000 == 1)
 			s = isc_start_and_send(status_vector, &request, &gds_trans, 0, (USHORT) length, buffer, 0);
 		else
 			s = isc_send(status_vector, &request, 0, (USHORT) length, buffer, 0);
+
+		resync = (s != 0);
 
 		if (s)
 		{
@@ -3064,6 +3067,8 @@ rec_type get_data(BurpGlobals* tdgbl, burp_rel* relation, bool skip_relation)
 					BURP_error_redirect (status_vector, 48);
 					// msg 48 isc_send failed
 			}
+
+			records--;
 		}
 		if (record != rec_data)
 			break;

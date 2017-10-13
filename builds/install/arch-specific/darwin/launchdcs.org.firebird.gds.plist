@@ -8,7 +8,7 @@
 <string>org.firebird.gds</string>
 <key>ProgramArguments</key>
 <array>
-<string>/Library/Frameworks/Firebird.framework/Resources/bin/fbserver</string>
+<string>/Library/Frameworks/Firebird.framework/Resources/bin/firebird</string>
 </array>
 <key>InetdCompatibility</key>
 <dict>
@@ -29,8 +29,6 @@
 <string>IPv4</string>
 </dict>
 </dict>
-<key>OnDemand</key>
-<true/>
 <key>UserName</key>
 <string>firebird</string>
 </dict>

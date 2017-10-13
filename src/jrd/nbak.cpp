@@ -567,6 +567,7 @@ void BackupManager::endBackup(thread_db* tdbb, bool recover)
 
 		if (all.getFirst())
 		{
+			int n = 0;
 			do {
 				if (--tdbb->tdbb_quantum < 0)
 					JRD_reschedule(tdbb, QUANTUM, true);
@@ -577,11 +578,17 @@ void BackupManager::endBackup(thread_db* tdbb, bool recover)
 				NBAK_TRACE(("Merge: page %d is fetched", all.current().db_page));
 				if (page->pag_scn != current_scn)
 				{
-					CCH_MARK(tdbb, &window2);
+					CCH_MARK_SYSTEM(tdbb, &window2);
 					NBAK_TRACE(("Merge: page %d is marked", all.current().db_page));
 				}
 				CCH_RELEASE(tdbb, &window2);
 				NBAK_TRACE(("Merge: page %d is released", all.current().db_page));
+
+				if (++n == 512)
+				{
+					CCH_flush(tdbb, FLUSH_SYSTEM, 0);
+					n = 0;
+				}
 			} while (all.getNext());
 		}
 
