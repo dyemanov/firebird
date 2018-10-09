@@ -29,6 +29,14 @@
 #include "alloc.h"
 #include "../common/SimpleStatusVector.h"
 #include "../common/dllinst.h"
+#include "../common/os/os_utils.h"
+
+#ifdef HAVE_DLADDR
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <dlfcn.h>
+#endif // HAVE_DLADDR
 
 // Setting this define helps (with AV at exit time) detect globals
 // with destructors, declared not using InstanceControl.
@@ -84,6 +92,43 @@ namespace
 		if (dontCleanup)
 			return;
 
+#ifdef DEBUG_GDS_ALLOC
+		Firebird::AutoPtr<FILE> file;
+
+		{	// scope
+			Firebird::PathName name = "memdebug.log";
+#ifdef HAVE_DLADDR
+			Dl_info path;
+			if (dladdr((void*) &allClean, &path))
+			{
+				name = path.dli_fname;
+				name += ".memdebug.log";
+			}
+			else
+			{
+				fprintf(stderr, "dladdr: %s\n", dlerror());
+			}
+#elif defined(WIN_NT)
+			HMODULE hmod = 0;
+			GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+				(LPCTSTR) &allClean,
+				&hmod);
+
+			if (hmod)
+			{
+				char moduleName[MAX_PATH];
+				DWORD len = GetModuleFileName(hmod, moduleName, MAX_PATH);
+				if (len < MAX_PATH)
+				{
+					name = moduleName;
+					name += ".memdebug.log";
+				}
+			}
+#endif	// HAVE_DLADDR
+			file = os_utils::fopen(name.c_str(), "w+t");
+		}
+#endif	// DEBUG_GDS_ALLOC
+
 		Firebird::InstanceControl::destructors();
 
 		if (dontCleanup)
@@ -100,6 +145,15 @@ namespace
 
 		try
 		{
+#ifdef DEBUG_GDS_ALLOC
+			// In Debug mode - this will report all memory leaks
+			if (file)
+			{
+				getDefaultMemoryPool()->print_contents(file,
+					Firebird::MemoryPool::PRINT_USED_ONLY | Firebird::MemoryPool::PRINT_RECURSIVE);
+				file = NULL;
+			}
+#endif
 			Firebird::MemoryPool::cleanup();
 		}
 		catch (...)
@@ -173,12 +227,37 @@ namespace Firebird
 	{
 		MutexLockGuard guard(*StaticMutex::mutex, "InstanceControl::InstanceList::InstanceList");
 		next = instanceList;
+		prev = NULL;
+		if (instanceList)
+			instanceList->prev = this;
 		instanceList = this;
 	}
 
 	InstanceControl::InstanceList::~InstanceList()
 	{
-		delete next;
+		fb_assert(next == NULL);
+		fb_assert(prev == NULL);
+	}
+
+	void InstanceControl::InstanceList::remove()
+	{
+		MutexLockGuard guard(*StaticMutex::mutex, FB_FUNCTION);
+		unlist();
+	}
+
+	void InstanceControl::InstanceList::unlist()
+	{
+		if (instanceList == this)
+			instanceList = next;
+
+		if (next)
+			next->prev = this->prev;
+
+		if (prev)
+			prev->next = this->next;
+
+		prev = NULL;
+		next = NULL;
 	}
 
 	void InstanceControl::destructors()
@@ -245,8 +324,13 @@ namespace Firebird
 			}
 		} while (nextPriority != currentPriority);
 
-		delete instanceList;
-		instanceList = 0;
+
+		while (instanceList)
+		{
+			InstanceList* item = instanceList;
+			item->unlist();
+			delete item;
+		}
 	}
 
 	void InstanceControl::registerGdsCleanup(FPTR_VOID cleanup)

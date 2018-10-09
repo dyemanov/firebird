@@ -203,7 +203,7 @@ public:
 	void addCTEs(WithClause* withClause);
 	SelectExprNode* findCTE(const Firebird::MetaName& name);
 	void clearCTEs();
-	void checkUnusedCTEs() const;
+	void checkUnusedCTEs();
 
 	// hvlad: each member of recursive CTE can refer to CTE itself (only once) via
 	// CTE name or via alias. We need to substitute this aliases when processing CTE

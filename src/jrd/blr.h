@@ -407,4 +407,9 @@
 #define blr_record_version2			(unsigned char) 209
 #define blr_gen_id2					(unsigned char) 210 // NEXT VALUE FOR generator
 
+// FB 3.0.4 specific BLR
+
+#define blr_local_timestamp         (unsigned char) 214
+#define blr_local_time              (unsigned char) 215
+
 #endif // JRD_BLR_H

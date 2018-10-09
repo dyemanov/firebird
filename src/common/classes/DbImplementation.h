@@ -24,11 +24,15 @@
  *  Contributor(s): ______________________________________.
  */
 
+#ifndef DBIMPLEMENTATION_H
+#define DBIMPLEMENTATION_H
+
 #include "../common/classes/fb_string.h"
 
 namespace Ods {
 
 struct header_page;
+struct generator_page;
 
 }
 
@@ -41,7 +45,9 @@ public:
 	DbImplementation (UCHAR p_cpu, UCHAR p_os, UCHAR p_cc, UCHAR p_flags)
 		: di_cpu(p_cpu), di_os(p_os), di_cc(p_cc), di_flags(p_flags)
 	{ }
-	DbImplementation (UCHAR p_compatImpl);
+	DbImplementation ()
+		: di_cpu(255u), di_os(255u), di_cc(255u), di_flags(255u)
+	{ }
 	~DbImplementation() { }
 
 private:
@@ -61,7 +67,13 @@ public:
 	UCHAR backwardCompatibleImplementation() const;
 	static DbImplementation fromBackwardCompatibleByte(UCHAR bcImpl);
 
+	bool same() const;
+	bool ods12_1_gen() const;
+	bool ods12_0_gen() const;
+
 	static const DbImplementation current;
 };
 
 } //namespace Firebird
+
+#endif //DBIMPLEMENTATION_H

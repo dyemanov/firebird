@@ -568,7 +568,7 @@ int CLIB_ROUTINE main( int argc, char *argv[])
 		exit(FINI_OK);
 	}
 
-	Firebird::AutoPtr<UCHAR, Firebird::ArrayDelete<UCHAR> > buffer;
+	Firebird::AutoPtr<UCHAR> buffer;
 	lhb* LOCK_header = NULL;
 	Firebird::AutoPtr<sh_mem> shmem_data;
 

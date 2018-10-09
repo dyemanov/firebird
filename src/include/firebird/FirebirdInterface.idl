@@ -211,6 +211,10 @@ interface PluginFactory : Versioned
 interface PluginModule : Versioned
 {
 	void doClean();
+
+version:		// 3.0.3 => 3.0.4
+	// Used to release resources allocated per-thread 
+	void threadDetach();
 }
 
 // Interface to deal with plugins here and there, returned by master interface
@@ -582,6 +586,8 @@ interface ClientBlock : ReferenceCounted
 	const uchar* getData(uint* length);
 	void putData(Status status, uint length, const void* data);
 	CryptKey newKey(Status status);
+version:	// 3.0 => 4.0
+	AuthBlock getAuthBlock(Status status);
 }
 
 // server part of authentication plugin
@@ -667,6 +673,17 @@ interface Management : PluginBase
 	int execute(Status status, User user, ListUsers callback);
 	void commit(Status status);
 	void rollback(Status status);
+}
+
+interface AuthBlock : Versioned
+{
+	const string getType();
+	const string getName();
+	const string getPlugin();
+	const string getSecurityDb();
+	const string getOriginalPlugin();
+	boolean next(Status status);
+	boolean first(Status status);
 }
 
 

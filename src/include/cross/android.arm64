@@ -206,6 +206,9 @@
 /* Define to 1 if you have the `gmtime_r' function. */
 #define HAVE_GMTIME_R 1
 
+/* Define to 1 if you have the `ctime_r' function. */
+#define HAVE_CTIME_R 1
+
 /* Define to 1 if you have the <grp.h> header file. */
 #define HAVE_GRP_H 1
 

@@ -23,6 +23,7 @@
 #include "firebird.h"
 #include "../jrd/ods.h"
 #include "../jrd/ods_proto.h"
+#include "../common/classes/DbImplementation.h"
 
 using namespace Firebird;
 
@@ -36,8 +37,10 @@ namespace
 
 namespace Ods {
 
-bool isSupported(USHORT majorVersion, USHORT minorVersion)
+bool isSupported(const header_page* hdr)
 {
+	USHORT majorVersion = hdr->hdr_ods_version;
+	USHORT minorVersion = hdr->hdr_ods_minor;
 	const bool isFirebird = (majorVersion & ODS_FIREBIRD_FLAG);
 	majorVersion &= ~ODS_FIREBIRD_FLAG;
 
@@ -49,11 +52,50 @@ bool isSupported(USHORT majorVersion, USHORT minorVersion)
 		minorVersion >= ODS_RELEASED &&
 		minorVersion <= ODS_CURRENT)
 	{
-		return true;
+		if (minorVersion == ODS_CURRENT12_0)
+		{
+			generator_page page;
+			if (!getGpgValues(&page, DbImplementation(hdr), minorVersion))
+				return false;
+		}
+		if (minorVersion != ODS_CURRENT12_1)
+			return true;
 	}
 
 	// Do not support anything else
 	return false;
+}
+
+SINT64* getGpgValues(generator_page* page, DbImplementation di, USHORT minorVersion)
+{
+	if (minorVersion >= ODS_CURRENT12_2)
+		return page->gpg_values;
+
+	// ODS_12_0
+	if (di.same())			// use DB on same platform where it was created
+	{
+		struct generator_page_12_0
+		{
+			pag gpg_header;
+			ULONG gpg_sequence;			// Sequence number
+			SINT64 gpg_values[1];		// Generator vector
+		};
+
+		return ((generator_page_12_0*)page)->gpg_values;
+	}
+
+	if (di.ods12_1_gen())	// use DB known to have layout matching with 12.1
+		return page->gpg_values;
+
+	if (di.ods12_0_gen())	// use DB known to have buggy layout
+	{
+		UCHAR* p = (UCHAR*) page;
+		p += sizeof(pag);
+		p += sizeof(ULONG);
+		return (SINT64*)p;
+	}
+
+	return NULL;
 }
 
 ULONG bytesBitPIP(ULONG page_size)

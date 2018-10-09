@@ -257,7 +257,7 @@ void MAKE_desc_from_field(dsc* desc, const dsql_fld* field)
 	desc->dsc_flags = (field->flags & FLD_nullable) ? DSC_nullable : 0;
 
 	if (desc->isText() || desc->isBlob())
-		desc->setTextType(INTL_CS_COLL_TO_TTYPE(field->charSetId, field->collationId));
+		desc->setTextType(INTL_CS_COLL_TO_TTYPE(field->charSetId.value, field->collationId));
 
 	// UNICODE_FSS_HACK
 	// check if the field is a system domain and CHARACTER SET is UNICODE_FSS

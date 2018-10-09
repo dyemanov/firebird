@@ -1,4 +1,784 @@
   **************************
+  * v3.0.4
+  **************************
+
+    * Bugfix CORE-5911
+        Connection could hung after no activity for 60 seconds
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5905
+        Inconsistencies with PSQL FUNCTION vs UDF
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5904
+        An attempt to create global mapping with long (> SQL identifier length) FROM field fails
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5900
+        Login attempts while engine is shutting down caused unnecessary delays in shutdown process
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5899
+        Memory leak in GBAK code when used as service
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5898
+        ROLE not passed in EXECUTE STATEMENT ... ON EXTERNAL
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5893
+        GBAK may crash database when mixing alias with full database name
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5891
+        Invalid events are released in mapping shared memory when dead process is detected
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5886
+        Nbackup does not work after 32K of backups iterations
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5884
+        Initial global mapping from Srp plugin does not work
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5881
+        Network server ignores any error that took place in KeyHolderPlugin when establishing initial callback with client
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5880
+        Unhandled: C0000005.ACCESS_VIOLATION
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5879
+        Error reading/writing data to connection
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5872
+        Database validation reports false errors "Record XXX has bad transaction" and\or "Record XXX is wrong length" when record transaction number is greater than 2^32
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5870
+        ISQL's "show database" command works wrong with 64-bit numbers
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5869
+        Sweep can't move OIT value over 2^32, when Next already greater than 2^32 (4'294'967'296)
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5865
+        Alignment error on x86_64
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5863
+        Classic process crashes when client has disconnected
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5852
+        There is no check of existance generator and exception when privileges are granted
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5847
+        "Malformed string" instead of key value in PK violation error message
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5846
+        CREATE VIEW issues "Implementation of text subtype 512 not located"
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5844
+        Firebird freezes for new connections
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5843
+        Wrong handling of failures of TRANSACTION START trigger
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5840
+        Reference privilege is ignored
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5837
+        Inconsistent results when working with GLOBAL TEMPORARY TABLE ON COMMIT PRESERVE ROWS
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5833
+        DDL triggers for some object types (views, exceptions, roles, indexes, domains) are lost in backup-restore process
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5831
+        Not user-friendly output of GSTAT at encrypted database
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5830
+        Encryption Interface crashing Firebird process when working on big db file
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5829
+        GSEC does not release user manager plugin
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5824
+        Segmentation fault during install on Linux
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5822
+        Client gets SQLSTATE = 28000 ("user/password not defined") if WireCrypt = Disabled is used on client side
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5819
+        Attachment might not gone after it was deleted FROM MON$ATTACHMENTS
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5817
+        Unable to compile Firebird with ICU 60 or higer
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5815
+        Server hangs for 60/120 seconds if client exits during database encryption key transfer callback
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5804
+        Multiple errors in REVOKE operator
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5801
+        All database blobs can be acceses by any user (id iteration may be used for unauthorized access)
+      Contributor(s):
+        Dmitriy Starodubov <dmitry.starodubov at red-soft.biz>
+
+    * Bugfix CORE-5796
+        GSTAT may produce faulty report about presence of some none-encrypted pages in database
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5793
+        Error returned from DbCryptPlugin::setKey() is not shown
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5791
+        ODS for windows builds and linux-x64 (on the one side) and linux-x86 (on the other side) does not match
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5790
+        User with DROP DATABASE privilege can't drop database
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5788
+        Security Patch: Replacement of use of SHA-1 in the SRP Client Proof with SHA-256
+      Contributor(s):
+        Tony Whyman <tony.whyman at mccallumwhyman.com>
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5783
+        EXECUTE STATEMENT ignores the text of the SQL-query after a comment of the form "-"
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5780
+        Server hangs when client tries to send too long DB encryption key(s)
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5778
+        install.sh fails if -path argument contains "firebird"
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5776
+        "Input parameter mismatch" error after altering external function into PSQL function
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5773
+        PSQL cursor doesn't see inserted record
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5772
+        Client hangs when working with events under high load
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5769
+        Database crypt plugin sample on Pascal is broken
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5765
+        Missing directives in Firebird.pas
+      Contributor(s):
+        Tony Whyman <tony.whyman at mccallumwhyman.com>
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5764
+        Installation of Firebird 3.0.3 on SLES 12 SP3 fails with ''Could not find acceptable ICU library"
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5762
+        Wrong transaction number in RDB$PAGES relation may cause infinite recusrion in engine and segfault
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5760
+        Server process crashes while restoring database
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5757
+        Deadlock with events
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5756
+        FB crashes when trying to recreate table that is in use by DML
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-5755
+        No error if the GRANT target object does not exist
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5754
+        ALTER TRIGGER check privilege for alter database instead of table
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5753
+        Parser should not allow to use GRANT OPTION for FUNCTION and PACKAGE
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5747
+        User can grant usage privilege by himself
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5745
+        GRANT privileges error during database restore
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5743
+        Conversion error when both GROUP/ORDER BY expressions and WHERE expressions contain literals
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5742
+        Incorrect error message in iSQL when trying to create database with wrong password
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5737
+        Invalid parameters of gds transaction in ISQL
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5702
+        Firebird Handle Leak Windows
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5436
+        SuperClassic server hangs (under load test)
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-4964
+        Real errors during connect to security database are hidden by Srp user manager
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-405
+        Garbage vs indices/constraints
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5913
+        Add context variables with compression and encryption status of current connection
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5908
+        Enhance dynamic libraries loading related error messages
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5876
+        Provide name of udf function for "arithmetic exception, numeric overflow, or string truncation"
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5860
+        Support auth_plugin_list dpb/spb item from application to client
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5853
+        Forward-compatible expressions LOCALTIME and LOCALTIMESTAMP
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Improvement CORE-5746
+        Remove the restriction on create/delete, enable/disable the user-defined indexes in system tables
+      Contributor(s):
+        Rashid Abzalov <rashid.abzalov at gmail.com>
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+
+  **************************
+  * v3.0.3
+  **************************
+
+    * Bugfix CORE-5735
+        Additional keyholder opens unauthorized connections to encrypted database
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5730
+        Connection to server may hang when working with encrypted databases over non-TCP protocol
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5721
+        Information items isc_info_length and fb_info_crypt_state have the same code
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5720
+        Sweep in Firebird 3 in CS mode could run too slow when there is big load on server
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5719
+        FB 3 crashes when restoring backup made by FB 2.5
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5713
+        Field alias disappears in complex query
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5707
+        Begin and end of physical backup in the same transaction could crash engine
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5706
+        Trace config with misplaced "{" lead Firebird to crash
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5695
+        Position function does not consider the collation for blob
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5694
+        Duplicate values in columns with a unique constraint
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5686
+        Firebird 3.0.2 allows any protocol version >= 10 to connect, including interbase protocol 14
+      Contributor(s):
+        Mark Rotteveel <mark at lawinegevaar.nl>
+
+    * Bugfix CORE-5684
+        Error "no current record for fetch operation" is raised while deleting record from MON$ATTACHMENTS using ORDER BY clause
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-5681
+        AV when external statement is executed and local transaction is rolled back
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5675
+        isc_vax_integer() and isc_portable_integer() work wrongly with short negative numbers
+      Contributor(s):
+        Dimitry Sibiryakov <sd at ibphoenix.com>
+
+    * Bugfix CORE-5673
+        Unique constraint not working in encrypted database on first command
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5667
+        Message "CTE 'X' has cyclic dependencies" appear when 'X' is alias for resultset and there is previous CTE part with the same name 'X' in the query
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5659
+        Bad PLAN generated for query on Firebird v3.0
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-5655
+        isc_info_sql_relation_alias reports incorrect alias for CTE or nested queries
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5654
+        Mixed intermediate build files for plugins examples
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5653
+        GBAK restore with large number of small blobs is very slow using Linux Classic
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5651
+        Problem migrating users to V3.0
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5650
+        Segfault when procedure is being dropped on Classic server
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5649
+        isc_add_user / isc_modify_user produce unusable user record
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5645
+        Wrong transaction can be passed to the external engine
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5643
+        Message "Operating system call munmap failed" can appear in firebird.log under heavy load (2.5.x, CS, SC)
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5638
+        Wrong result with index on case-insensitive collation using NUMERIC-SORT
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5630
+        Cannot create the shadow file
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5624
+        Using backslash in alias on Linux does not work
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5618
+        Part of the pages of the second level blobs is not released when deleting relations
+      Contributor(s):
+        Denis Logashov <den.logash at gmail.com>
+
+    * Bugfix CORE-5613
+        SuperServer could hung when changing physical backup state under high load
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5605
+        Incorrect check for existing MAP in a case when pre-FB3 security database is used
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5600
+        Invalid blob id when add a new blob column of type text and update another field
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5598
+        Error "block size exceeds implementation restriction" while inner joining large datasets with a long key using the HASH JOIN plan
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-5591
+        Engine hangs soon after some errors during transaction start
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5588
+        DbInfo interface is not passed to ancillary instances of plugin
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5580
+        Signature of packaged functions is not checked for mismatch with [NOT] DETERMINISTIC attribute
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5579
+        Request synchronization error in the GBAK utility (during restore)
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5576
+        Bugcheck on queries containing WITH LOCK clause
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5570
+        Negative infinity (double) shown incorrectly without sign in ISQL
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5569
+        ISQL incorrectly pads UNICODE_FSS/UTF8 columns when they use a collation
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5567
+        Direct system table modifications are not completely prohibited
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5566
+        Server crashes while restoring backup if the shadow file already exists
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-5562
+        Firebird crashes when UDF gets loaded and unloaded frequently
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5555
+        Firebird 3 error handling for SELECT WITH LOCK breaks compatibility with 2.5
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5553
+        Database cannot be encrypted if DatabaseAccess is set to None
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5550
+        Computed decimal field in a view has wrong RDB$FIELD_PRECISION
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5549
+        Errors building / running FB on non-SSE enabled HW
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5547
+        Server crashes while compiling stored procedure with nested references to query-based computed fields
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-5542
+        Database-level triggers related to TRANSACTION events (start/commit/rollback) do not take in account their POSITION index
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5540
+        Every other execution of embedded ISQL is slow
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5535
+        Garbage value in RDB$FIELD_SUB_TYPE in RDB$FUNCTION_ARGUMENTS after altering function
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5533
+        Crash on 3.0 and 4.0 when DB contains database-level trigger
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5528
+        internal Firebird consistency check (limbo impossible (184), file: vio.cpp line: 2379)
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5527
+        External routines does not receive default values for they output parameters
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5526
+        External routines receives parameters with incorrect length or datatype
+      Contributor(s):
+        Adriano dos Santos Fernandes <adrianosf at gmail.com>
+
+    * Bugfix CORE-5521
+        Race condition between event notification and event registration
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5517
+        Classic server periodically raise "Global mapping memory overflow" and need to be restarted to accept new connections
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Bugfix CORE-5516
+        Firebird service crashes when stopping
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5510
+        Firebird 3+ may send status vector with more then 20 items to old clients and cause disconnect
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+
+    * Bugfix CORE-5416
+        Memory leak: Firebird does not release memory after load tests
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-5415
+        [security3.fdb] wrong page type page 22 is of wrong type (expected pointer, found index root)
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-4492
+        OR/IN predicates for RDB$DBKEY lead to NATURAL plan
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Bugfix CORE-2853
+        Bugcheck: page N, page type 5 lock conversion denied (215)
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-2731
+        Recursive EXECUTE STATEMENT works wrong
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-2502
+        Aliases and error about cyclic dependencies in CTE
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Bugfix CORE-2284
+        Records left in RDB$PAGES after rollback of CREATE TABLE statement
+      Contributor(s):
+        Roman Simakov <roman.simakov at red-soft.biz>
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Improvement CORE-5727
+        Faster engine response on cancel/shutdown signals when scanning long list of pointer pages
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5712
+        Access to the name of DB encryption key
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5704
+        Avoid UPDATE of RDB$DATABASE by ALTER DATABASE statement when possible
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5676
+        Consider equivalence classes for index navigation
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Improvement CORE-5674
+        Allow unused Common Table Expressions
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5660
+        Make flush of big number of dirty pages faster
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5648
+        Avoid serialization of isc_attach_database calls issued by EXECUTE STATEMENT implementation
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5629
+        GSTAT output does not include datetime of analysis
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5614
+        Physical backup merge stage could run too long, especially with huge page cache
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5610
+        Provide info about database (or alias) which was in use during "Error during sweep: connection shutdown"
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5602
+        ALTER DOMAIN is slow if many dependencies exist
+      Contributor(s):
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-5601
+        Add details on compression and crypt status of connection (fb_info_conn_flags) to getInfo() API call
+      Contributor(s):
+        Alex Peshkov <peshkoff at mail.ru>
+
+    * Improvement CORE-5543
+        Restore of pre ODS 11.1 database can leave RDB$RELATION_TYPE null
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+    * Improvement CORE-4913
+        Database backup using Nbackup is getting slow when directed to NAS over SMB protocol
+      Contributor(s):
+        Jan Hejda <jan.hejda at lim.cz>
+        Vlad Khorsun <hvlad at users.sourceforge.net>
+
+    * Improvement CORE-3295
+        Estimate the actual record compression ratio in the optimizer
+      Contributor(s):
+        Dmitry Yemanov <dimitr at firebirdsql.org>
+
+
+  **************************
   * v3.0.2
   **************************
 

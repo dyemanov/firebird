@@ -42,14 +42,16 @@ const size_t ACL_BLOB_BUFFER_SIZE = MAX_USHORT; // used to read/write acl blob
 class SecurityClass
 {
 public:
-    typedef ULONG flags_t;
+	typedef ULONG flags_t;
+	enum BlobAccessCheck { BA_UNKNOWN, BA_SUCCESS, BA_FAILURE };
 
 	SecurityClass(Firebird::MemoryPool &pool, const Firebird::MetaName& name)
-		: scl_flags(0), scl_name(pool, name)
+		: scl_flags(0), scl_name(pool, name), scl_blb_access(BA_UNKNOWN)
 	{}
 
 	flags_t scl_flags;			// Access permissions
 	const Firebird::MetaName scl_name;
+	BlobAccessCheck scl_blb_access;
 
 	static const Firebird::MetaName& generate(const void*, const SecurityClass* item)
 	{
@@ -155,7 +157,7 @@ public:
 		return *this;
 	}
 
-	void populateDpb(Firebird::ClumpletWriter& dpb);
+	void populateDpb(Firebird::ClumpletWriter& dpb, bool embeddedSupport);
 };
 
 // These numbers are arbitrary and only used at run-time. Can be changed if necessary at any moment.

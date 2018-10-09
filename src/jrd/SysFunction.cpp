@@ -209,6 +209,8 @@ const char
 	// SYSTEM namespace: connection wise items
 	SESSION_ID_NAME[] = "SESSION_ID",
 	NETWORK_PROTOCOL_NAME[] = "NETWORK_PROTOCOL",
+	WIRE_COMPRESSED_NAME[] = "WIRE_COMPRESSED",
+	WIRE_ENCRYPTED_NAME[] = "WIRE_ENCRYPTED",
 	CLIENT_ADDRESS_NAME[] = "CLIENT_ADDRESS",
 	CLIENT_HOST_NAME[] = "CLIENT_HOST",
 	CLIENT_PID_NAME[] = "CLIENT_PID",
@@ -2188,6 +2190,20 @@ dsc* evlGetContext(thread_db* tdbb, const SysFunction*, const NestValueArray& ar
 				return NULL;
 
 			resultStr = attachment->att_network_protocol;
+		}
+		else if (nameStr == WIRE_COMPRESSED_NAME)
+		{
+			if (attachment->att_network_protocol.isEmpty())
+				return NULL;
+
+			resultStr = (attachment->att_remote_flags & isc_dpb_addr_flag_conn_compressed) ? TRUE_VALUE : FALSE_VALUE;
+		}
+		else if (nameStr == WIRE_ENCRYPTED_NAME)
+		{
+			if (attachment->att_network_protocol.isEmpty())
+				return NULL;
+
+			resultStr = (attachment->att_remote_flags & isc_dpb_addr_flag_conn_encrypted) ? TRUE_VALUE : FALSE_VALUE;
 		}
 		else if (nameStr == CLIENT_ADDRESS_NAME)
 		{

@@ -17,26 +17,30 @@
 # Start of file prefix.darwin:	$(VERSION)	@PLATFORM@
 # 2 Oct 2002, Nickolay Samofatov - Major Cleanup
 #
-# Default build from 10.7 using Clang
-# Use this file to create a 32bit version of Firebird for intel
-# Instructions if running MacOSX 10.7
-# 1. edit configure.in so that MAKEFILE_PREFIX=darwin_i386
-# 2. dnl the CPU_TYPE
-# 3. edit extern/icu/source/config and set the right 32bit flags (-arch i386)
-# 4. for  CFLAGS, CXXFLAGS, LDFLAGS export '-m32 -arch i386'
-# 5. export MACOSX_DEPLOYMENT_TARGET=10.7 
+# Default build from 10.9 using Clang
+#
+# Build instructions
+# set CFLAGS='-I ICUDIR/icu/source/common -m32 -arch i386' (ucnv.h)
+# set LDFLAGS='-L ICUDIR/icu/source/lib -m32 -arch i386' (-licuuc)
+# set CXXFLAGS='-I ICUDIR/icu/source/common -I ICUDIR/icu/source/i18n -m32 -arch i386'
+# where ICUDIR is where you installed ICU
+# configure using --with-builtin-tommath
+# or add the relevant -I, -L for an installed version of libtommath
 
-DYLD_LIBRARY_PATH=$(FIREBIRD)/lib
+DYLD_LIBRARY_PATH=$(HOME)/icu54/icu/source/lib
 export DYLD_LIBRARY_PATH
 
-MACOSX_DEPLOYMENT_TARGET=10.7
+MACOSX_DEPLOYMENT_TARGET=10.9
 export MACOSX_DEPLOYMENT_TARGET
 
-PROD_FLAGS=-O1 -DDARWIN -pipe -MMD -fPIC -fno-common -arch i386 -mmacosx-version-min=10.7
-DEV_FLAGS=-ggdb -DDARWIN -pipe -MMD -fPIC -fno-common -Wall -arch i386 -mmacosx-version-min=10.7 -Wno-non-virtual-dtor
-CXXFLAGS:=$(CXXFLAGS) -fvisibility-inlines-hidden -fvisibility=hidden -fno-weak -msse4
+PROD_FLAGS=-DDARWIN -pipe -O2 -MMD -fPIC -fno-common -arch i386 -mmacosx-version-min=10.9
+DEV_FLAGS=-ggdb -DDARWIN -pipe -MMD -fPIC -fno-common -Wall -arch i386 -mmacosx-version-min=10.9 -Wno-non-virtual-dtor
+CXXFLAGS:=$(CXXFLAGS) -fvisibility-inlines-hidden -fvisibility=hidden -msse4 
 
 EXE_LINK_OPTIONS:=-m32
 LD_FLAGS+=-m32 -arch i386
+LINK_LIBS+=-liconv
+MATHLIB=$(ROOT)/extern/libtommath/.libs/libtommath.a
+SO_LINK_LIBS+=-liconv
 
 include $(ROOT)/gen/darwin.defaults

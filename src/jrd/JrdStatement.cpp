@@ -161,6 +161,9 @@ JrdStatement::JrdStatement(thread_db* tdbb, MemoryPool* p, CompilerScratch* csb)
 			if (!tail->csb_fields && !(tail->csb_flags & csb_update))
 				 rpb->rpb_stream_flags |= RPB_s_no_data;
 
+			if (tail->csb_flags & csb_unstable)
+				rpb->rpb_stream_flags |= RPB_s_unstable;
+
 			rpb->rpb_relation = tail->csb_relation;
 
 			delete tail->csb_fields;
@@ -405,11 +408,23 @@ void JrdStatement::verifyAccess(thread_db* tdbb)
 		if (item->exa_action == ExternalAccess::exa_procedure)
 		{
 			routine = MET_lookup_procedure_id(tdbb, item->exa_prc_id, false, false, 0);
+			if (!routine)
+			{
+				string name;
+				name.printf("id %d", item->exa_prc_id);
+				ERR_post(Arg::Gds(isc_prcnotdef) << name);
+			}
 			aclType = id_procedure;
 		}
 		else if (item->exa_action == ExternalAccess::exa_function)
 		{
 			routine = Function::lookup(tdbb, item->exa_fun_id, false, false, 0);
+			if (!routine)
+			{
+				string name;
+				name.printf("id %d", item->exa_fun_id);
+				ERR_post(Arg::Gds(isc_funnotdef) << name);
+			}
 			aclType = id_function;
 		}
 		else

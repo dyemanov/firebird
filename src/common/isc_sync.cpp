@@ -2208,12 +2208,14 @@ SharedMemoryBase::SharedMemoryBase(const TEXT* filename, ULONG length, IpcObject
 
 	if (file_handle == INVALID_HANDLE_VALUE)
 	{
-		if ((err == ERROR_SHARING_VIOLATION))
+		if ((err == ERROR_SHARING_VIOLATION) || (err == ERROR_ACCESS_DENIED))
 		{
 			if (!init_flag) {
 				CloseHandle(event_handle);
 			}
-			goto retry;
+
+			if (retry_count < 200)	// 2 sec
+				goto retry;
 		}
 
 		CloseHandle(event_handle);

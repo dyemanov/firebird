@@ -581,7 +581,7 @@ static bool D_Transaction()
 // Transaction for all frontend commands
 static bool frontendTransaction()
 {
-	return startTransaction(&fbTrans, sizeof(default_tpb), default_tpb);
+	return startTransaction(&fbTrans);
 }
 
 static void atexit_fb_shutdown()
@@ -7763,7 +7763,7 @@ static void process_plan()
 			case isc_info_sql_get_plan:
 			case isc_info_sql_explain_plan:
 				{
-					const ULONG len = gds__vax_integer(ptr, sizeof(USHORT));
+					const USHORT len = (USHORT) gds__vax_integer(ptr, sizeof(USHORT));
 					ptr += sizeof(USHORT);
 					planString.assign((const char*) ptr, len);
 					ptr += len;

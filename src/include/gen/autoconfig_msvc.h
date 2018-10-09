@@ -196,6 +196,9 @@
 #undef HAVE_MKSTEMP
 #undef HAVE_LLRINT
 #undef HAVE_LOCALTIME_R
+#define HAVE_LOCALTIME_S
+#undef HAVE_CTIME_R
+#define HAVE_CTIME_S
 #undef HAVE_GMTIME_R
 #undef HAVE_SYS_SELECT_H
 

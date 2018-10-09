@@ -502,9 +502,12 @@ TraNumber TipCache::cacheTransactions(thread_db* tdbb, TraNumber oldest)
 	WIN window(HEADER_PAGE_NUMBER);
 	const Ods::header_page* header = (Ods::header_page*) CCH_FETCH(tdbb, &window, LCK_read, pag_header);
 	const TraNumber top = Ods::getNT(header);
-	const TraNumber hdr_oldest = Ods::getOIT(header);
+	const TraNumber hdr_oldest = MAX(Ods::getOIT(header), m_dbb->dbb_oldest_transaction);
 	CCH_RELEASE(tdbb, &window);
 #endif
+
+	// Don't try to ask for non-existing TIP page
+	oldest = MIN(oldest, top);
 
 	// hvlad: No need to cache TIP pages below hdr_oldest just refreshed from
 	// header page. Moreover our tip cache can now contain a gap between the last

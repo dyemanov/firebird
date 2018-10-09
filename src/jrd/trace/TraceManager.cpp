@@ -260,8 +260,7 @@ void TraceManager::update_session(const TraceSession& session)
 					mapUser(s_user, t_role, NULL, NULL, session.ses_auth,
 						attachment->att_filename.c_str(), dbb->dbb_filename.c_str(),
 						dbb->dbb_config->getSecurityDatabase(),
-						dbb->dbb_provider->getCryptCallback(),
-						attachment->getInterface());
+						dbb->dbb_callback, attachment->getInterface());
 				}
 				catch (const Firebird::Exception&)
 				{

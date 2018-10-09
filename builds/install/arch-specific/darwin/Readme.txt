@@ -1,8 +1,10 @@
-The Firebird install process will create a new user: firebird. This is for added security. Please don't delete this user unless you know what you are doing. The installer installs the Firebird framework in /Library/Frameworks. The default installs one super-user database user: "sysdba" with a password "masterkey". You should change that password using gsec or isql according to the documentation.
+The Firebird install process will create a new user: firebird. This is for added security. Please don't delete this user. The installer creates a Firebird framework in /Library/Frameworks. By default the install creates one super-user database user "SYSDBA" with a password "masterkey". You should change that password using gsec or isql according to the documentation.
 
-All the standard command line executables are installed in /Library/Frameworks/Firebird.framework/Resources/bin. If you are interested in helping with the Firebird Project please contact us via the Firebird website at www.firebirdsql.org.
+All the standard command line executables are installed in /Library/Frameworks/Firebird.framework/Resources/bin. 
 
-The release notes can be found in the doc directory  Generic documentation for Firebird can be found on www.firebirdsql.org and the IBPhoenix web site at www.ibphoenix.com. There is a Yahoo group named "ib-support" if you have any problems with Firebird.
+If you are interested in helping with the Firebird Project please contact us via the Firebird website at www.firebirdsql.org.
+
+The release notes can be found in the doc directory.  More generic documentation for Firebird can be found on www.firebirdsql.org and the IBPhoenix web site at www.ibphoenix.com. There is also a yahoo group that can be subscribed to named "ib-support" if you have any problems.
 
 Thanks to:
 John Bellardo (Original MacOSX port for Firebird)

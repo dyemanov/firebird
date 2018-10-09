@@ -191,6 +191,14 @@ namespace fb_utils
 	// Check does vector contain particular code or not
 	bool containsErrorCode(const ISC_STATUS* v, ISC_STATUS code);
 
+	bool inline isNetworkError(ISC_STATUS code)
+	{
+		return code == isc_network_error || 
+			code == isc_net_write_err || 
+			code == isc_net_read_err ||
+			code == isc_lost_db_connection;
+	}
+
 	// Uppercase/strip string according to login rules
 	const char* dpbItemUpper(const char* s, FB_SIZE_T l, Firebird::string& buf);
 

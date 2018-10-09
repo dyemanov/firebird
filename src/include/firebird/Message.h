@@ -139,7 +139,7 @@
 
 #define FB__META_FB_BOOLEAN	\
 	builder->setType(status, index, SQL_BOOLEAN);	\
-	builder->setLength(status, index, sizeof(ISC_BOOLEAN));
+	builder->setLength(status, index, sizeof(FB_BOOLEAN));
 
 #define FB__META_FB_DATE	\
 	builder->setType(status, index, SQL_DATE);	\

@@ -123,6 +123,7 @@ const USHORT rpb_long_tranum	= 1024;		// transaction number is 64-bit
 const USHORT RPB_s_update	= 0x01;	// input stream fetched for update
 const USHORT RPB_s_no_data	= 0x02;	// nobody is going to access the data
 const USHORT RPB_s_sweeper	= 0x04;	// garbage collector - skip swept pages
+const USHORT RPB_s_unstable = 0x08;	// don't use undo log, used with unstable explicit cursors
 
 // Runtime flags
 

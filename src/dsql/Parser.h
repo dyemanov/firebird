@@ -223,6 +223,7 @@ private:
 
 	int yylex();
 	bool yylexSkipSpaces();
+	bool yylexSkipEol();	// returns true if EOL is detected and skipped
 	int yylexAux();
 
 	void yyerror(const TEXT* error_string);
@@ -252,7 +253,7 @@ private:
 		clause = value;
 	}
 
-	template <typename T, typename Delete>
+	template <typename T, template <typename C> class Delete>
 	void setClause(Firebird::AutoPtr<T, Delete>& clause, const char* duplicateMsg, T* value)
 	{
 		checkDuplicateClause(clause, duplicateMsg);

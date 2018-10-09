@@ -105,7 +105,7 @@ namespace
 	{
 		ModuleLoader::doctorModuleExtension(libName);
 
-		ModuleLoader::Module* module = ModuleLoader::loadModule(libName);
+		ModuleLoader::Module* module = ModuleLoader::loadModule(NULL, libName);
 		if (!module)
 		{
 			message.printf("%s library has not been found", libName.c_str());
@@ -767,11 +767,22 @@ void FUN_evaluate(thread_db* tdbb, const Function* function, const NestValueArra
 	blob_stack.close();
 
 	} // try
+	catch (const status_exception& ex)
+	{
+		while (array_stack.hasData())
+			delete[] array_stack.pop();
+
+		Arg::StatusVector v(ex);
+		string msg = "UDF: ";
+		msg += function->getName().toString();
+		v << Arg::Gds(isc_random) << msg;
+
+		v.raise();
+	}
 	catch (const Exception&)
 	{
-		while (array_stack.hasData()) {
+		while (array_stack.hasData())
 			delete[] array_stack.pop();
-		}
 
 		throw;
 	}

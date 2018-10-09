@@ -738,8 +738,8 @@ void INF_database_info(thread_db* tdbb,
 
 				win window(PageNumber(DB_PAGE_SPACE, page_num));
 
-				Ods::pag* page = CCH_FETCH(tdbb, &window, LCK_WAIT, pag_undefined);
-				info = INF_put_item(item, dbb->dbb_page_size, reinterpret_cast<UCHAR*>(page), info, end);
+				Ods::pag* page = CCH_FETCH(tdbb, &window, LCK_read, pag_undefined);
+				info = INF_put_item(item, dbb->dbb_page_size, page, info, end);
 				CCH_RELEASE_TAIL(tdbb, &window);
 
 				if (!info)
@@ -767,6 +767,25 @@ void INF_database_info(thread_db* tdbb,
 		case fb_info_crypt_state:
 			length = INF_convert(dbb->dbb_crypto_manager ?
 				dbb->dbb_crypto_manager->getCurrentState() : 0, buffer);
+			break;
+
+		case fb_info_crypt_key:
+			if (tdbb->getAttachment()->locksmith())
+			{
+				const char* key = dbb->dbb_crypto_manager->getKeyName();
+				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(key)), key, info, end)))
+				{
+					if (transaction)
+						TRA_commit(tdbb, transaction, false);
+
+					return;
+				}
+				continue;
+			}
+
+			buffer[0] = item;
+			item = isc_info_error;
+			length = 1 + INF_convert(isc_adm_task_denied, buffer + 1);
 			break;
 
 		case fb_info_conn_flags:
@@ -797,7 +816,7 @@ void INF_database_info(thread_db* tdbb,
 
 UCHAR* INF_put_item(UCHAR item,
 					USHORT length,
-					const UCHAR* string,
+					const void* data,
 					UCHAR* ptr,
 					const UCHAR* end,
 					const bool inserting)
@@ -827,7 +846,7 @@ UCHAR* INF_put_item(UCHAR item,
 
 	if (length)
 	{
-		memmove(ptr, string, length);
+		memmove(ptr, data, length);
 		ptr += length;
 	}
 

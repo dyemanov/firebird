@@ -52,6 +52,7 @@
 #include "../common/classes/GenericMap.h"
 #include "../common/classes/RefCounted.h"
 #include "../common/classes/semaphore.h"
+#include "../common/classes/DbImplementation.h"
 #include "../common/utils_proto.h"
 #include "../jrd/RandomGenerator.h"
 #include "../common/os/guid.h"
@@ -79,7 +80,6 @@ class ExternalFileDirectoryList;
 class MonitoringData;
 class GarbageCollector;
 class CryptoManager;
-class JProvider;
 
 // general purpose vector
 template <class T, BlockType TYPE = type_vec>
@@ -331,13 +331,12 @@ public:
 		bool active;
 	};
 
-	static Database* create(Firebird::IPluginConfig* pConf, JProvider* provider, bool shared)
+	static Database* create(Firebird::IPluginConfig* pConf, bool shared)
 	{
 		Firebird::MemoryStats temp_stats;
 		MemoryPool* const pool = MemoryPool::createPool(NULL, temp_stats);
 		Database* const dbb = FB_NEW_POOL(*pool) Database(pool, pConf, shared);
 		pool->setStatsGroup(dbb->dbb_memory_stats);
-		dbb->dbb_provider = provider;
 		return dbb;
 	}
 
@@ -376,7 +375,7 @@ public:
 	LockManager*	dbb_lock_mgr;
 	EventManager*	dbb_event_mgr;
 
-	JProvider*	dbb_provider;			// Provider that owns this database block
+	Firebird::ICryptKeyCallback*	dbb_callback;	// Parent's crypt callback
 	Database*	dbb_next;				// Next database block in system
 	Attachment* dbb_attachments;		// Active attachments
 	Attachment* dbb_sys_attachments;	// System attachments
@@ -398,6 +397,7 @@ public:
 
 	MonitoringData*			dbb_monitoring_data;	// monitoring data
 
+	Firebird::SyncObject dbb_modules_sync;
 	DatabaseModules	dbb_modules;		// external function/filter modules
 	ExtEngineManager dbb_extManager;	// external engine manager
 
@@ -411,6 +411,7 @@ public:
 	USHORT dbb_dp_per_pp;				// data pages per pointer page
 	USHORT dbb_max_records;				// max record per data page
 	USHORT dbb_max_idx;					// max number of indexes on a root page
+	Firebird::DbImplementation	dbb_implementation;	// implementation
 
 #ifdef SUPERSERVER_V2
 	USHORT dbb_prefetch_sequence;		// sequence to pace frequency of prefetch requests
@@ -495,6 +496,8 @@ public:
 	}
 
 	void deletePool(MemoryPool* pool);
+
+	void registerModule(Module&);
 
 private:
 	Database(MemoryPool* p, Firebird::IPluginConfig* pConf, bool shared)

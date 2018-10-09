@@ -422,20 +422,6 @@ int CLIB_ROUTINE main( int argc, char** argv)
 
 		SRVR_multi_thread(port, INET_SERVER_flag);
 
-#ifdef DEBUG_GDS_ALLOC
-		// In Debug mode - this will report all server-side memory leaks due to remote access
-
-		Firebird::PathName name = fb_utils::getPrefix(
-			Firebird::IConfigManager::DIR_LOG, "memdebug.log");
-		FILE* file = os_utils::fopen(name.c_str(), "w+t");
-		if (file)
-		{
-			fprintf(file, "Global memory pool allocated objects\n");
-			getDefaultMemoryPool()->print_contents(file);
-			fclose(file);
-		}
-#endif
-
 		// perform atexit shutdown here when all globals in embedded library are active
 		// also sync with possibly already running shutdown in dedicated thread
 		fb_shutdown(10000, fb_shutrsn_exit_called);

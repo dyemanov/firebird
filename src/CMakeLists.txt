@@ -54,7 +54,6 @@ set(epp_boot_gds_files
     jrd/grant.epp
     jrd/ini.epp
     jrd/met.epp
-    jrd/pcmet.epp
     jrd/scl.epp
     jrd/Function.epp
 )
@@ -361,7 +360,7 @@ add_library                 (burp ${burp_src} ${burp_generated_src_master})
 # LIBRARY common
 ########################################
 
-file(GLOB common_src "common/*.cpp" "common/classes/*.cpp" "common/config/*.cpp" "common/os/${OS_DIR}/*.cpp")
+file(GLOB common_src "common/*.cpp" "common/classes/*.cpp" "common/config/*.cpp" "common/os/${OS_DIR}/*.cpp" "common/sha2/*.cpp")
 file(GLOB_RECURSE common_include "common/*.h")
 
 if (APPLE)
@@ -484,7 +483,6 @@ set(engine12_generated_src
     jrd/grant.epp
     jrd/ini.epp
     jrd/met.epp
-    jrd/pcmet.epp
     jrd/scl.epp
     utilities/gstat/dba.epp
 )

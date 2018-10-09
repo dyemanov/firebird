@@ -1221,9 +1221,13 @@ const StmtNode* CursorStmtNode::execute(thread_db* tdbb, jrd_req* request, ExeSt
 
 static RegisterNode<DeclareCursorNode> regDeclareCursorNode(blr_dcl_cursor);
 
-DmlNode* DeclareCursorNode::parse(thread_db* tdbb, MemoryPool& pool, CompilerScratch* csb, const UCHAR /*blrOp*/)
+DmlNode* DeclareCursorNode::parse(thread_db* tdbb, MemoryPool& pool, CompilerScratch* csb, const UCHAR blrOp)
 {
 	DeclareCursorNode* node = FB_NEW_POOL(pool) DeclareCursorNode(pool);
+
+	fb_assert(blrOp == blr_dcl_cursor);
+	if (blrOp == blr_dcl_cursor)
+		node->dsqlCursorType = CUR_TYPE_EXPLICIT;
 
 	node->cursorNumber = csb->csb_blr_reader.getWord();
 	node->rse = PAR_rse(tdbb, csb);
@@ -1329,11 +1333,14 @@ DeclareCursorNode* DeclareCursorNode::pass2(thread_db* tdbb, CompilerScratch* cs
 
 	// Activate cursor streams to allow index usage for <cursor>.<field> references, see CORE-4675.
 	// It's also useful for correlated sub-queries in the select list, see CORE-4379.
+	// Mark cursor streams as unstable, see CORE-5773.
 
 	for (StreamList::const_iterator i = cursorStreams.begin(); i != cursorStreams.end(); ++i)
 	{
 		csb->csb_rpt[*i].csb_cursor_number = cursorNumber;
 		csb->csb_rpt[*i].activate();
+		if (dsqlCursorType == CUR_TYPE_EXPLICIT)
+			csb->csb_rpt[*i].csb_flags |= csb_unstable;
 	}
 
 	return this;
@@ -1531,7 +1538,7 @@ DeclareSubFuncNode* DeclareSubFuncNode::dsqlPass(DsqlCompilerScratch* dsqlScratc
 	dsqlFunction->udf_scale = returnType->scale;
 	dsqlFunction->udf_sub_type = returnType->subType;
 	dsqlFunction->udf_length = returnType->length;
-	dsqlFunction->udf_character_set_id = returnType->charSetId;
+	dsqlFunction->udf_character_set_id = returnType->charSetId.value;
 
 	const Array<NestConst<ParameterClause> >& paramArray = dsqlBlock->parameters;
 	bool defaultFound = false;
@@ -1996,7 +2003,7 @@ const StmtNode* DeclareVariableNode::execute(thread_db* tdbb, jrd_req* request, 
 	{
 		impure_value* variable = request->getImpure<impure_value>(impureOffset);
 		variable->vlu_desc = varDesc;
-		variable->vlu_desc.dsc_flags = 0;
+		variable->vlu_desc.clearFlags();
 
 		if (variable->vlu_desc.dsc_dtype <= dtype_varying)
 		{
@@ -3245,7 +3252,8 @@ void ExecStatementNode::genBlr(DsqlCompilerScratch* dsqlScratch)
 	}
 
 	// If no new features of EXECUTE STATEMENT are used, lets generate old BLR.
-	if (!dataSource && !userName && !password && !role && !useCallerPrivs && !inputs && !traScope)
+	if (!dataSource && !userName && !password && !role && !useCallerPrivs && !inputs &&
+		 traScope == EDS::traNotSet)
 	{
 		if (outputs)
 		{
@@ -3306,7 +3314,7 @@ void ExecStatementNode::genBlr(DsqlCompilerScratch* dsqlScratch)
 		genOptionalExpr(dsqlScratch, blr_exec_stmt_role, role);
 
 		// dsqlScratch's transaction behavior.
-		if (traScope)
+		if (traScope != EDS::traNotSet)
 		{
 			// Transaction parameters equal to current transaction.
 			dsqlScratch->appendUChar(blr_exec_stmt_tran_clone);
@@ -3674,17 +3682,23 @@ const StmtNode* InAutonomousTransactionNode::execute(thread_db* tdbb, jrd_req* r
 		TRA_attach_request(transaction, request);
 		tdbb->setTransaction(transaction);
 
+		try
+		{
+			// run ON TRANSACTION START triggers
+			JRD_run_trans_start_triggers(tdbb, transaction);
+		}
+		catch (Exception&)
+		{
+			TRA_attach_request(org_transaction, request);
+			tdbb->setTransaction(org_transaction);
+			throw;
+		}
+
 		request->req_auto_trans.push(org_transaction);
 		impure->traNumber = transaction->tra_number;
 
 		VIO_start_save_point(tdbb, transaction);
 		impure->savNumber = transaction->tra_save_point->sav_number;
-
-		if (!(attachment->att_flags & ATT_no_db_triggers))
-		{
-			// run ON TRANSACTION START triggers
-			EXE_execute_db_triggers(tdbb, transaction, TRIGGER_TRANS_START);
-		}
 
 		return action;
 	}
@@ -6601,7 +6615,7 @@ StmtNode* StoreNode::internalDsqlPass(DsqlCompilerScratch* dsqlScratch, bool upd
 StmtNode* StoreNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 {
 	bool needSavePoint;
-	StmtNode* node = SavepointEncloseNode::make(getPool(), dsqlScratch, 
+	StmtNode* node = SavepointEncloseNode::make(getPool(), dsqlScratch,
 		internalDsqlPass(dsqlScratch, false, needSavePoint));
 
 	if (!needSavePoint || node->is<SavepointEncloseNode>())

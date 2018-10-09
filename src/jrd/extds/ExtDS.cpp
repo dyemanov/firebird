@@ -62,10 +62,13 @@ Manager::Manager(MemoryPool& pool) :
 
 Manager::~Manager()
 {
+	ThreadContextHolder tdbb;
+
 	while (m_providers)
 	{
 		Provider* to_delete = m_providers;
 		m_providers = m_providers->m_next;
+		to_delete->clearConnections(tdbb);
 		delete to_delete;
 	}
 }
@@ -273,7 +276,7 @@ void Provider::cancelConnections()
 	Connection** end = m_connections.end();
 
 	for (; ptr < end; ptr++) {
-		(*ptr)->cancelExecution();
+		(*ptr)->cancelExecution(true);
 	}
 }
 
@@ -322,7 +325,7 @@ void Connection::generateDPB(thread_db* tdbb, ClumpletWriter& dpb,
 	if ((m_provider.getFlags() & prvTrustedAuth) &&
 		user.isEmpty() && pwd.isEmpty() && role.isEmpty())
 	{
-		attachment->att_user->populateDpb(dpb);
+		attachment->att_user->populateDpb(dpb, true);
 	}
 	else
 	{
@@ -335,6 +338,7 @@ void Connection::generateDPB(thread_db* tdbb, ClumpletWriter& dpb,
 		if (!role.isEmpty()) {
 			dpb.insertString(isc_dpb_sql_role_name, role);
 		}
+		attachment->att_user->populateDpb(dpb, false);
 	}
 
 	CharSet* const cs = INTL_charset_lookup(tdbb, attachment->att_charset);
@@ -365,8 +369,24 @@ Transaction* Connection::createTransaction()
 	return tran;
 }
 
-void Connection::deleteTransaction(Transaction* tran)
+void Connection::deleteTransaction(thread_db* tdbb, Transaction* tran)
 {
+	// Close all active statements in tran context avoiding commit of already 
+	// deleted transaction
+	Statement** stmt_ptr = m_statements.begin();
+	while (stmt_ptr < m_statements.end())
+	{
+		Statement* stmt = *stmt_ptr;
+		if (stmt->getTransaction() == tran)
+		{
+			if (stmt->isActive())
+				stmt->close(tdbb, true);
+		}
+		// close() above could destroy statement and remove it from m_statements
+		if (stmt_ptr < m_statements.end() && *stmt_ptr == stmt)
+			stmt_ptr++;
+	}
+
 	FB_SIZE_T pos;
 	if (m_transactions.find(tran, pos))
 	{
@@ -378,7 +398,7 @@ void Connection::deleteTransaction(Transaction* tran)
 	}
 
 	if (!m_used_stmts && m_transactions.getCount() == 0 && !m_deleting)
-		m_provider.releaseConnection(JRD_get_thread_data(), *this);
+		m_provider.releaseConnection(tdbb, *this);
 }
 
 Statement* Connection::createStatement(const string& sql)
@@ -445,21 +465,33 @@ void Connection::clearTransactions(Jrd::thread_db* tdbb)
 	while (m_transactions.getCount())
 	{
 		Transaction* tran = m_transactions[0];
-		tran->rollback(tdbb, false);
+		try
+		{
+			tran->rollback(tdbb, false);
+		}
+		catch (const Exception&)
+		{
+			if (!m_deleting)
+				throw;
+		}
 	}
 }
 
 void Connection::clearStatements(thread_db* tdbb)
 {
 	Statement** stmt_ptr = m_statements.begin();
-	Statement** end = m_statements.end();
-
-	for (; stmt_ptr < end; stmt_ptr++)
+	while (stmt_ptr < m_statements.end())
 	{
 		Statement* stmt = *stmt_ptr;
 		if (stmt->isActive())
 			stmt->close(tdbb);
-		Statement::deleteStatement(tdbb, stmt);
+
+		// close() above could destroy statement and remove it from m_statements
+		if (stmt_ptr < m_statements.end() && *stmt_ptr == stmt)
+		{
+			Statement::deleteStatement(tdbb, stmt);
+			stmt_ptr++;
+		}
 	}
 
 	m_statements.clear();
@@ -657,7 +689,7 @@ void Transaction::commit(thread_db* tdbb, bool retain)
 	if (!retain)
 	{
 		detachFromJrdTran();
-		m_connection.deleteTransaction(this);
+		m_connection.deleteTransaction(tdbb, this);
 	}
 }
 
@@ -670,7 +702,7 @@ void Transaction::rollback(thread_db* tdbb, bool retain)
 	if (!retain)
 	{
 		detachFromJrdTran();
-		m_connection.deleteTransaction(this);
+		m_connection.deleteTransaction(tdbb, this);
 	}
 
 	if (status->getState() & IStatus::STATE_ERRORS) {
@@ -710,7 +742,7 @@ Transaction* Transaction::getTransaction(thread_db* tdbb, Connection* conn, TraS
 		}
 		catch (const Exception&)
 		{
-			conn->deleteTransaction(ext_tran);
+			conn->deleteTransaction(tdbb, ext_tran);
 			throw;
 		}
 	}
@@ -723,11 +755,12 @@ void Transaction::detachFromJrdTran()
 	if (m_scope != traCommon)
 		return;
 
-	fb_assert(m_jrdTran);
+	fb_assert(m_jrdTran || m_connection.isBroken());
 	if (!m_jrdTran)
 		return;
 
 	Transaction** tran_ptr = &m_jrdTran->tra_ext_common;
+	m_jrdTran = NULL;
 	for (; *tran_ptr; tran_ptr = &(*tran_ptr)->m_nextTran)
 	{
 		if (*tran_ptr == this)
@@ -807,6 +840,8 @@ Statement::~Statement()
 
 void Statement::deleteStatement(Jrd::thread_db* tdbb, Statement* stmt)
 {
+	if (stmt->m_boundReq)
+		stmt->unBindFromRequest();
 	stmt->deallocate(tdbb);
 	delete stmt;
 }
@@ -908,7 +943,7 @@ bool Statement::fetch(thread_db* tdbb, const ValueListNode* out_params)
 	return true;
 }
 
-void Statement::close(thread_db* tdbb)
+void Statement::close(thread_db* tdbb, bool invalidTran)
 {
 	// we must stuff exception if and only if this is the first time it occurs
 	// once we stuff exception we must punt
@@ -936,6 +971,9 @@ void Statement::close(thread_db* tdbb)
 	if (m_boundReq) {
 		unBindFromRequest();
 	}
+
+	if (invalidTran)
+		m_transaction = NULL;
 
 	if (m_transaction && m_transaction->getScope() == traAutonomous)
 	{
@@ -1048,15 +1086,19 @@ static TokenType getToken(const char** begin, const char* end)
 	case '-':
 		if (p < end && *p == '-')
 		{
-			while (p < end)
+			while (++p < end)
 			{
-				if (*p++ == '\n')
+				if (*p == '\r')
 				{
-					p--;
-					ret = ttComment;
+					p++;
+					if (p < end && *p == '\n')
+						p++;
 					break;
 				}
+				else if (*p == '\n')
+					break;
 			}
+			ret = ttComment;
 		}
 		else {
 			ret = ttOther;
@@ -1581,7 +1623,7 @@ void Statement::unBindFromRequest()
 void EngineCallbackGuard::init(thread_db* tdbb, Connection& conn, const char* from)
 {
 	m_tdbb = tdbb;
-	m_mutex = conn.isConnected() ? &conn.m_mutex : &conn.m_provider.m_mutex;
+	m_mutex = &conn.m_mutex;
 	m_saveConnection = NULL;
 
 	if (m_tdbb)
@@ -1599,8 +1641,13 @@ void EngineCallbackGuard::init(thread_db* tdbb, Connection& conn, const char* fr
 		if (attachment)
 		{
 			m_saveConnection = attachment->att_ext_connection;
-			attachment->att_ext_connection = &conn;
-			attachment->getStable()->getMutex()->leave();
+			m_stable = attachment->getStable();
+			m_stable->getMutex()->leave();
+
+			MutexLockGuard guardAsync(*m_stable->getMutex(true, true), FB_FUNCTION);
+			MutexLockGuard guardMain(*m_stable->getMutex(), FB_FUNCTION);
+			if (m_stable->getHandle() == attachment)
+				attachment->att_ext_connection = &conn;
 		}
 	}
 
@@ -1618,11 +1665,15 @@ EngineCallbackGuard::~EngineCallbackGuard()
 	if (m_tdbb)
 	{
 		Jrd::Attachment* attachment = m_tdbb->getAttachment();
-
-		if (attachment)
+		if (attachment && m_stable.hasData())
 		{
-			attachment->getStable()->getMutex()->enter(FB_FUNCTION);
-			attachment->att_ext_connection = m_saveConnection;
+			MutexLockGuard guardAsync(*m_stable->getMutex(true, true), FB_FUNCTION);
+			m_stable->getMutex()->enter(FB_FUNCTION);
+
+			if (m_stable->getHandle() == attachment)
+				attachment->att_ext_connection = m_saveConnection;
+			else
+				m_stable->getMutex()->leave();
 		}
 
 		jrd_tra* transaction = m_tdbb->getTransaction();

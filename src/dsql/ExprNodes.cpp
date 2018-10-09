@@ -2885,7 +2885,7 @@ dsc* CastNode::execute(thread_db* tdbb, jrd_req* request) const
 		return NULL;
 
 	if (DTYPE_IS_BLOB(value->dsc_dtype) || DTYPE_IS_BLOB(impure->vlu_desc.dsc_dtype))
-		blb::move(tdbb, value, &impure->vlu_desc, NULL);
+		blb::move(tdbb, value, &impure->vlu_desc);
 	else
 		MOV_move(tdbb, value, &impure->vlu_desc);
 
@@ -3460,14 +3460,15 @@ dsc* CurrentDateNode::execute(thread_db* /*tdbb*/, jrd_req* request) const
 
 static RegisterNode<CurrentTimeNode> regCurrentTimeNode(blr_current_time);
 static RegisterNode<CurrentTimeNode> regCurrentTimeNode2(blr_current_time2);
+static RegisterNode<CurrentTimeNode> regCurrentTimeNode3(blr_local_time);
 
 DmlNode* CurrentTimeNode::parse(thread_db* /*tdbb*/, MemoryPool& pool, CompilerScratch* csb, const UCHAR blrOp)
 {
 	unsigned precision = DEFAULT_TIME_PRECISION;
 
-	fb_assert(blrOp == blr_current_time || blrOp == blr_current_time2);
+	fb_assert(blrOp == blr_current_time || blrOp == blr_current_time2 || blrOp == blr_local_time);
 
-	if (blrOp == blr_current_time2)
+	if (blrOp == blr_current_time2 || blrOp == blr_local_time)
 	{
 		precision = csb->csb_blr_reader.getByte();
 
@@ -3489,12 +3490,17 @@ string CurrentTimeNode::internalPrint(NodePrinter& printer) const
 
 void CurrentTimeNode::setParameterName(dsql_par* parameter) const
 {
-	parameter->par_name = parameter->par_alias = "CURRENT_TIME";
+	parameter->par_name = parameter->par_alias = dsqlLocal ? "LOCALTIME" : "CURRENT_TIME";
 }
 
 void CurrentTimeNode::genBlr(DsqlCompilerScratch* dsqlScratch)
 {
-	if (precision == DEFAULT_TIME_PRECISION)
+	if (dsqlLocal)
+	{
+		dsqlScratch->appendUChar(blr_local_time);
+		dsqlScratch->appendUChar(precision);
+	}
+	else if (precision == DEFAULT_TIME_PRECISION)
 		dsqlScratch->appendUChar(blr_current_time);
 	else
 	{
@@ -3572,15 +3578,16 @@ dsc* CurrentTimeNode::execute(thread_db* /*tdbb*/, jrd_req* request) const
 
 static RegisterNode<CurrentTimeStampNode> regCurrentTimeStampNode(blr_current_timestamp);
 static RegisterNode<CurrentTimeStampNode> regCurrentTimeStampNode2(blr_current_timestamp2);
+static RegisterNode<CurrentTimeStampNode> regCurrentTimeStampNode3(blr_local_timestamp);
 
 DmlNode* CurrentTimeStampNode::parse(thread_db* /*tdbb*/, MemoryPool& pool, CompilerScratch* csb,
 	const UCHAR blrOp)
 {
 	unsigned precision = DEFAULT_TIMESTAMP_PRECISION;
 
-	fb_assert(blrOp == blr_current_timestamp || blrOp == blr_current_timestamp2);
+	fb_assert(blrOp == blr_current_timestamp || blrOp == blr_current_timestamp2 || blrOp == blr_local_timestamp);
 
-	if (blrOp == blr_current_timestamp2)
+	if (blrOp == blr_current_timestamp2 || blrOp == blr_local_timestamp)
 	{
 		precision = csb->csb_blr_reader.getByte();
 
@@ -3602,12 +3609,17 @@ string CurrentTimeStampNode::internalPrint(NodePrinter& printer) const
 
 void CurrentTimeStampNode::setParameterName(dsql_par* parameter) const
 {
-	parameter->par_name = parameter->par_alias = "CURRENT_TIMESTAMP";
+	parameter->par_name = parameter->par_alias = dsqlLocal ? "LOCALTIMESTAMP" : "CURRENT_TIMESTAMP";
 }
 
 void CurrentTimeStampNode::genBlr(DsqlCompilerScratch* dsqlScratch)
 {
-	if (precision == DEFAULT_TIMESTAMP_PRECISION)
+	if (dsqlLocal)
+	{
+		dsqlScratch->appendUChar(blr_local_timestamp);
+		dsqlScratch->appendUChar(precision);
+	}
+	else if (precision == DEFAULT_TIMESTAMP_PRECISION)
 		dsqlScratch->appendUChar(blr_current_timestamp);
 	else
 	{
@@ -5858,6 +5870,7 @@ dsc* FieldNode::execute(thread_db* tdbb, jrd_req* request) const
 	if (format &&
 		record->getFormat()->fmt_version != format->fmt_version &&
 		fieldId < format->fmt_desc.getCount() &&
+		!format->fmt_desc[fieldId].isUnknown() &&
 		!DSC_EQUIV(&impure->vlu_desc, &format->fmt_desc[fieldId], true))
 	{
 		dsc desc = impure->vlu_desc;
@@ -6824,7 +6837,16 @@ bool LiteralNode::sameAs(const ExprNode* other, bool ignoreStreams) const
 	const LiteralNode* const otherNode = other->as<LiteralNode>();
 	fb_assert(otherNode);
 
-	return !MOV_compare(&litDesc, &otherNode->litDesc);
+	try
+	{
+		return MOV_compare(&litDesc, &otherNode->litDesc) == 0;
+	}
+	catch (const status_exception&)
+	{
+		thread_db* tdbb = JRD_get_thread_data();
+		fb_utils::init_status(tdbb->tdbb_status_vector);
+		return false;
+	}
 }
 
 ValueExprNode* LiteralNode::pass2(thread_db* tdbb, CompilerScratch* csb)
@@ -7171,19 +7193,33 @@ ValueExprNode* DerivedFieldNode::dsqlFieldRemapper(FieldRemapper& visitor)
 void DerivedFieldNode::setParameterName(dsql_par* parameter) const
 {
 	const dsql_ctx* context = NULL;
-	const FieldNode* fieldNode;
-	const RecordKeyNode* dbKeyNode;
+	const FieldNode* fieldNode = NULL;
+	const RecordKeyNode* dbKeyNode = NULL;
 
-	if ((fieldNode = value->as<FieldNode>()))
+	const DerivedFieldNode* drvField = value->as<DerivedFieldNode>();
+	while (drvField)
+	{
+		if (fieldNode = drvField->value->as<FieldNode>())
+			break;
+
+		if (dbKeyNode = drvField->value->as<RecordKeyNode>())
+			break;
+
+		drvField = drvField->value->as<DerivedFieldNode>();
+	};
+
+	if (fieldNode || (fieldNode = value->as<FieldNode>()))
 	{
 		parameter->par_name = fieldNode->dsqlField->fld_name.c_str();
 		context = fieldNode->dsqlContext;
 	}
-	else if ((dbKeyNode = value->as<RecordKeyNode>()))
+	else if (dbKeyNode || (dbKeyNode = value->as<RecordKeyNode>()))
 		dbKeyNode->setParameterName(parameter);
 
 	parameter->par_alias = name;
 	setParameterInfo(parameter, context);
+
+	parameter->par_rel_alias = this->context->ctx_alias;
 }
 
 void DerivedFieldNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -8170,11 +8206,14 @@ dsc* ParameterNode::execute(thread_db* tdbb, jrd_req* request) const
 			}
 			else if (desc->isBlob())
 			{
-				if (desc->getCharSet() != CS_NONE && desc->getCharSet() != CS_BINARY)
-				{
-					const bid* const blobId = reinterpret_cast<bid*>(desc->dsc_address);
+				const bid* const blobId = reinterpret_cast<bid*>(desc->dsc_address);
 
-					if (!blobId->isEmpty())
+				if (!blobId->isEmpty())
+				{
+					if (!request->hasInternalStatement())
+						tdbb->getTransaction()->checkBlob(tdbb, blobId, true);
+
+					if (desc->getCharSet() != CS_NONE && desc->getCharSet() != CS_BINARY)
 					{
 						AutoBlb blob(tdbb, blb::open(tdbb, tdbb->getTransaction(), blobId));
 						blob.getBlb()->BLB_check_well_formed(tdbb, desc);
@@ -11478,7 +11517,7 @@ ValueExprNode* UdfCallNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		dsc desc = node->dsqlFunction->udf_arguments[pos];
 
 		// UNICODE_FSS_HACK
-		if ((pos < node->dsqlFunction->udf_fld_system_arguments.getCount()) && 
+		if ((pos < node->dsqlFunction->udf_fld_system_arguments.getCount()) &&
 			node->dsqlFunction->udf_fld_system_arguments[pos])
 		{
 			DataTypeUtilBase::adjustSysFieldLength(&desc);
@@ -11527,36 +11566,73 @@ DmlNode* ValueIfNode::parse(thread_db* tdbb, MemoryPool& pool, CompilerScratch* 
 	MissingBoolNode* missing = node->condition->as<MissingBoolNode>();
 	if (missing)
 	{
-		StmtExprNode* missingCond = missing->arg->as<StmtExprNode>();
-		if (!missingCond)
+		StmtExprNode* stmtExpr = missing->arg->as<StmtExprNode>();
+		if (!stmtExpr)
 			return node;
 
-		CompoundStmtNode* stmt = missingCond->stmt->as<CompoundStmtNode>();
-		DeclareVariableNode* declStmt = NULL;
+		bool firstAssign = true;
 		AssignmentNode* assignStmt;
+		Array<USHORT> nullVariables;
 
-		if (stmt)
+		do
 		{
-			if (stmt->statements.getCount() != 2 ||
-				!(declStmt = stmt->statements[0]->as<DeclareVariableNode>()) ||
-				!(assignStmt = stmt->statements[1]->as<AssignmentNode>()))
+			CompoundStmtNode* stmt = stmtExpr->stmt->as<CompoundStmtNode>();
+			VariableNode* var = NULL;
+
+			if (stmt)
+			{
+				DeclareVariableNode* declStmt;
+
+				if (stmt->statements.getCount() != 2 ||
+					!(declStmt = stmt->statements[0]->as<DeclareVariableNode>()) ||
+					!(assignStmt = stmt->statements[1]->as<AssignmentNode>()) ||
+					!(var = assignStmt->asgnTo->as<VariableNode>()) ||
+					var->varId != declStmt->varId)
+				{
+					return node;
+				}
+			}
+			else if (!(assignStmt = stmtExpr->stmt->as<AssignmentNode>()) ||
+				!(var = assignStmt->asgnTo->as<VariableNode>()))
 			{
 				return node;
 			}
-		}
-		else if (!(assignStmt = missingCond->stmt->as<AssignmentNode>()))
-			return node;
 
-		VariableNode* var = node->falseValue->as<VariableNode>();
-		VariableNode* var2 = assignStmt->asgnTo->as<VariableNode>();
+			nullVariables.add(var->varId);
 
-		if (!var || !var2 || var->varId != var2->varId || (declStmt && declStmt->varId != var->varId))
-			return node;
+			if (firstAssign)
+			{
+				firstAssign = false;
+
+				VariableNode* var2 = node->falseValue->as<VariableNode>();
+
+				if (!var2 || var->varId != var2->varId)
+					return node;
+			}
+
+			stmtExpr = assignStmt->asgnFrom->as<StmtExprNode>();
+		} while (stmtExpr);
 
 		CoalesceNode* coalesceNode = FB_NEW_POOL(pool) CoalesceNode(pool);
 		coalesceNode->args = FB_NEW_POOL(pool) ValueListNode(pool, 2);
 		coalesceNode->args->items[0] = assignStmt->asgnFrom;
 		coalesceNode->args->items[1] = node->trueValue;
+
+		// Variables known to be NULL may be removed from the coalesce. This is not only an optimization!
+		// If not removed, error will happen as they correspondents declare nodes were removed.
+		if (CoalesceNode* subCoalesceNode = node->trueValue->as<CoalesceNode>())
+		{
+			NestValueArray& childItems = subCoalesceNode->args->items;
+
+			for (int i = childItems.getCount() - 1; i >= 0; --i)
+			{
+				if (VariableNode* childVar = childItems[i]->as<VariableNode>())
+				{
+					if (nullVariables.exist(childVar->varId))
+						childItems.remove(i);
+				}
+			}
+		}
 
 		return coalesceNode;
 	}

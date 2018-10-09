@@ -234,6 +234,15 @@ enum drq_type_t
 	drq_l_index_relname,	// lookup relation name for index
 	drq_l_trigger_relname,	// loopup relation name for trigger
 	drq_l_grant_option,		// loopup grant option for privilege
+	drq_l_grant_object,		// check grantor can grant object
+	drq_proc_exist,			// check if procedure exists
+	drq_udf_exist,			// check if udf exists
+	drq_package_exist,		// check if package exists
+	drq_trigger_exist,		// check if trigger exists
+	drq_rel_exist,			// check if relation or view exists
+	drq_exception_exist,	// check if exception exists
+	drq_generator_exist,	// check if generator exists
+	drq_rel_field_exist,	// check if a field of relation or view exists
 
 	drq_MAX
 };

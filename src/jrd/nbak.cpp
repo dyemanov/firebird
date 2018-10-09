@@ -408,6 +408,12 @@ ULONG BackupManager::getPageCount(thread_db* tdbb)
 
 bool BackupManager::extendDatabase(thread_db* tdbb)
 {
+	if (!alloc_table)
+	{
+		LocalAllocWriteGuard localAllocGuard(this);
+		actualizeAlloc(tdbb, false);
+	}
+
 	ULONG maxPage = 0;
 	{
 		LocalAllocReadGuard localAllocGuard(this);

@@ -1516,6 +1516,11 @@ static void force_close(rem_port* port)
 	if (!xcc)
 		return;
 
+	XPS xps = (XPS) xcc->xcc_mapped_addr;
+	if (xps) {
+		xps->xps_flags |= XPS_DISCONNECTED;
+	}
+
 	if (xcc->xcc_event_send_channel_filled)
 	{
 		CloseHandle(xcc->xcc_event_send_channel_filled);

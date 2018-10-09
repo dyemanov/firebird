@@ -528,7 +528,6 @@ RelationSourceNode* RelationSourceNode::parse(thread_db* tdbb, CompilerScratch* 
 	if (parseContext)
 	{
 		node->stream = PAR_context(csb, &node->context);
-		fb_assert(node->stream <= MAX_STREAMS);
 
 		csb->csb_rpt[node->stream].csb_relation = node->relation;
 		csb->csb_rpt[node->stream].csb_alias = aliasString;
@@ -596,11 +595,6 @@ RelationSourceNode* RelationSourceNode::copy(thread_db* tdbb, NodeCopier& copier
 	RelationSourceNode* newSource = FB_NEW_POOL(*tdbb->getDefaultPool()) RelationSourceNode(
 		*tdbb->getDefaultPool());
 
-	// Last entry in the remap contains the the original stream number.
-	// Get that stream number so that the flags can be copied
-	// into the newly created child stream.
-
-	const StreamType relativeStream = stream ? copier.remap[stream - 1] : stream;
 	newSource->stream = copier.csb->nextStream();
 	copier.remap[stream] = newSource->stream;
 
@@ -613,49 +607,52 @@ RelationSourceNode* RelationSourceNode::copy(thread_db* tdbb, NodeCopier& copier
 	element->csb_view = newSource->view;
 	element->csb_view_stream = copier.remap[0];
 
+/*
+	If there was a parent stream no., then copy the flags
+	from that stream to its children streams. (Bug 10164/10166)
+	For e.g. consider a view V1 with 2 streams:
+
+		stream #1 from table T1
+		stream #2 from table T2
+
+	consider a procedure P1 with 2 streams:
+
+		stream #1  from table X
+		stream #2  from view V1
+
+	During pass1 of procedure request, the engine tries to expand
+	all the views into their base tables. It creates a compiler
+	scratch block which initially looks like this:
+
+		stream 1  -------- X
+		stream 2  -------- V1
+
+	while expanding V1 the engine calls copy() with nod_relation.
+	A new stream 3 is created. Now the CompilerScratch looks like:
+
+		stream 1  -------- X
+		stream 2  -------- V1  map [2,3,4]
+		stream 3  -------- T1
+		stream 4  -------- T2
+
+	After T1 stream has been created the flags are copied from
+	stream #1 because V1's definition said the original stream
+	number for T1 was 1. However since its being merged with
+	the procedure request, stream #1 belongs to a different table.
+	The flags should be copied from stream 2 i.e. V1.
+
+	Since we didn't do this properly before, V1's children got
+	tagged with whatever flags X possesed leading to various
+	errors.
+*/
+
+	copier.csb->inheritViewFlags(newSource->stream, csb_no_dbkey);
+
 	if (alias.hasData())
 	{
 		element->csb_alias = FB_NEW_POOL(*tdbb->getDefaultPool())
 			string(*tdbb->getDefaultPool(), alias);
 	}
-
-	/** If there was a parent stream no., then copy the flags
-		from that stream to its children streams. (Bug 10164/10166)
-		For e.g.
-		consider a view V1 with 2 streams
-				stream #1 from table T1
-			stream #2 from table T2
-		consider a procedure P1 with 2 streams
-				stream #1  from table X
-			stream #2  from view V1
-
-		During pass1 of procedure request, the engine tries to expand
-		all the views into their base tables. It creates a compiler
-		scratch block which initially looks like this
-				stream 1  -------- X
-				stream 2  -------- V1
-			while expanding V1 the engine calls copy() with nod_relation.
-			A new stream 3 is created. Now the CompilerScratch looks like
-				stream 1  -------- X
-				stream 2  -------- V1  map [2,3]
-				stream 3  -------- T1
-			After T1 stream has been created the flags are copied from
-			stream #1 because V1's definition said the original stream
-			number for T1 was 1. However since its being merged with
-			the procedure request, stream #1 belongs to a different table.
-			The flags should be copied from stream 2 i.e. V1. We can get
-			this info from variable remap.
-
-			Since we didn't do this properly before, V1's children got
-			tagged with whatever flags X possesed leading to various
-			errors.
-
-			We now store the proper stream no in relativeStream and
-			later use it to copy the flags. -Sudesh (03/05/99)
-	**/
-
-	copier.csb->csb_rpt[newSource->stream].csb_flags |=
-		copier.csb->csb_rpt[relativeStream].csb_flags & csb_no_dbkey;
 
 	return newSource;
 }
@@ -693,7 +690,6 @@ void RelationSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, RseN
 
 	CompilerScratch::csb_repeat* const element = CMP_csb_element(csb, stream);
 	element->csb_view = parentView;
-	fb_assert(viewStream <= MAX_STREAMS);
 	element->csb_view_stream = viewStream;
 
 	// in the case where there is a parent view, find the context name
@@ -815,7 +811,6 @@ void RelationSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, RseN
 
 void RelationSourceNode::pass2Rse(thread_db* tdbb, CompilerScratch* csb)
 {
-	fb_assert(stream <= MAX_STREAMS);
 	csb->csb_rpt[stream].activate();
 
 	pass2(tdbb, csb);
@@ -1090,6 +1085,20 @@ ProcedureSourceNode* ProcedureSourceNode::copy(thread_db* tdbb, NodeCopier& copi
 	ProcedureSourceNode* newSource = FB_NEW_POOL(*tdbb->getDefaultPool()) ProcedureSourceNode(
 		*tdbb->getDefaultPool());
 
+	if (isSubRoutine)
+		newSource->procedure = procedure;
+	else
+	{
+		newSource->procedure = MET_lookup_procedure_id(tdbb, procedureId, false, false, 0);
+		if (!newSource->procedure)
+		{
+			string name;
+			name.printf("id %d", procedureId);
+			delete newSource;
+			ERR_post(Arg::Gds(isc_prcnotdef) << name);
+		}
+	}
+
 	// dimitr: See the appropriate code and comment in NodeCopier (in nod_argument).
 	// We must copy the message first and only then use the new pointer to
 	// copy the inputs properly.
@@ -1104,8 +1113,6 @@ ProcedureSourceNode* ProcedureSourceNode::copy(thread_db* tdbb, NodeCopier& copi
 	newSource->stream = copier.csb->nextStream();
 	copier.remap[stream] = newSource->stream;
 	newSource->context = context;
-	newSource->procedure = isSubRoutine ? procedure :
-		MET_lookup_procedure_id(tdbb, procedureId, false, false, 0);
 	newSource->isSubRoutine = isSubRoutine;
 	newSource->procedureId = procedureId;
 	newSource->view = view;
@@ -1115,14 +1122,16 @@ ProcedureSourceNode* ProcedureSourceNode::copy(thread_db* tdbb, NodeCopier& copi
 	element->csb_view = newSource->view;
 	element->csb_view_stream = copier.remap[0];
 
+	// dimitr:	I doubt we need to inherit this flag for procedures.
+	//			They don't have a DBKEY to be concatenated.
+	//			Neither they have a stream map to be expanded.
+	copier.csb->inheritViewFlags(newSource->stream, csb_no_dbkey);
+
 	if (alias.hasData())
 	{
 		element->csb_alias = FB_NEW_POOL(*tdbb->getDefaultPool())
 			string(*tdbb->getDefaultPool(), alias);
 	}
-
-	copier.csb->csb_rpt[newSource->stream].csb_flags |=
-		copier.csb->csb_rpt[stream].csb_flags & csb_no_dbkey;
 
 	return newSource;
 }
@@ -1154,7 +1163,6 @@ void ProcedureSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, Rse
 
 	CompilerScratch::csb_repeat* const element = CMP_csb_element(csb, stream);
 	element->csb_view = parentView;
-	fb_assert(viewStream <= MAX_STREAMS);
 	element->csb_view_stream = viewStream;
 
 	// in the case where there is a parent view, find the context name
@@ -1183,7 +1191,6 @@ RecordSourceNode* ProcedureSourceNode::pass2(thread_db* tdbb, CompilerScratch* c
 
 void ProcedureSourceNode::pass2Rse(thread_db* tdbb, CompilerScratch* csb)
 {
-	fb_assert(stream <= MAX_STREAMS);
 	csb->csb_rpt[stream].activate();
 
 	pass2(tdbb, csb);
@@ -1256,7 +1263,6 @@ AggregateSourceNode* AggregateSourceNode::parse(thread_db* tdbb, CompilerScratch
 		*tdbb->getDefaultPool());
 
 	node->stream = PAR_context(csb, NULL);
-	fb_assert(node->stream <= MAX_STREAMS);
 	node->rse = PAR_rse(tdbb, csb);
 	node->group = PAR_sort(tdbb, csb, blr_group_by, true);
 	node->map = parseMap(tdbb, csb, node->stream);
@@ -1425,14 +1431,11 @@ AggregateSourceNode* AggregateSourceNode::copy(thread_db* tdbb, NodeCopier& copi
 	AggregateSourceNode* newSource = FB_NEW_POOL(*tdbb->getDefaultPool()) AggregateSourceNode(
 		*tdbb->getDefaultPool());
 
-	fb_assert(stream <= MAX_STREAMS);
 	newSource->stream = copier.csb->nextStream();
-	// fb_assert(newSource->stream <= MAX_UCHAR);
 	copier.remap[stream] = newSource->stream;
 	CMP_csb_element(copier.csb, newSource->stream);
 
-	copier.csb->csb_rpt[newSource->stream].csb_flags |=
-		copier.csb->csb_rpt[stream].csb_flags & csb_no_dbkey;
+	copier.csb->inheritViewFlags(newSource->stream, csb_no_dbkey);
 
 	newSource->rse = rse->copy(tdbb, copier);
 	if (group)
@@ -1449,7 +1452,6 @@ void AggregateSourceNode::ignoreDbKey(thread_db* tdbb, CompilerScratch* csb) con
 
 RecordSourceNode* AggregateSourceNode::pass1(thread_db* tdbb, CompilerScratch* csb)
 {
-	fb_assert(stream <= MAX_STREAMS);
 	csb->csb_rpt[stream].csb_flags |= csb_no_dbkey;
 	rse->ignoreDbKey(tdbb, csb);
 
@@ -1465,7 +1467,6 @@ void AggregateSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, Rse
 {
 	stack.push(this);	// Assume that the source will be used. Push it on the final stream stack.
 
-	fb_assert(stream <= MAX_STREAMS);
 	pass1(tdbb, csb);
 
 	jrd_rel* const parentView = csb->csb_view;
@@ -1473,7 +1474,6 @@ void AggregateSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, Rse
 
 	CompilerScratch::csb_repeat* const element = CMP_csb_element(csb, stream);
 	element->csb_view = parentView;
-	fb_assert(viewStream <= MAX_STREAMS);
 	element->csb_view_stream = viewStream;
 
 }
@@ -1484,8 +1484,6 @@ RecordSourceNode* AggregateSourceNode::pass2(thread_db* tdbb, CompilerScratch* c
 	ExprNode::doPass2(tdbb, csb, map.getAddress());
 	ExprNode::doPass2(tdbb, csb, group.getAddress());
 
-	fb_assert(stream <= MAX_STREAMS);
-
 	processMap(tdbb, csb, map, &csb->csb_rpt[stream].csb_internal_format);
 	csb->csb_rpt[stream].csb_format = csb->csb_rpt[stream].csb_internal_format;
 
@@ -1494,7 +1492,6 @@ RecordSourceNode* AggregateSourceNode::pass2(thread_db* tdbb, CompilerScratch* c
 
 void AggregateSourceNode::pass2Rse(thread_db* tdbb, CompilerScratch* csb)
 {
-	fb_assert(stream <= MAX_STREAMS);
 	csb->csb_rpt[stream].activate();
 
 	pass2(tdbb, csb);
@@ -1622,7 +1619,6 @@ UnionSourceNode* UnionSourceNode::parse(thread_db* tdbb, CompilerScratch* csb, c
 	node->recursive = blrOp == blr_recurse;
 
 	node->stream = PAR_context(csb, NULL);
-	fb_assert(node->stream <= MAX_STREAMS);
 
 	// assign separate context for mapped record if union is recursive
 	StreamType stream2 = node->stream;
@@ -1756,26 +1752,20 @@ UnionSourceNode* UnionSourceNode::copy(thread_db* tdbb, NodeCopier& copier) cons
 		*tdbb->getDefaultPool());
 	newSource->recursive = recursive;
 
-	fb_assert(stream <= MAX_STREAMS);
 	newSource->stream = copier.csb->nextStream();
 	copier.remap[stream] = newSource->stream;
 	CMP_csb_element(copier.csb, newSource->stream);
 
-	StreamType oldStream = stream;
-	StreamType newStream = newSource->stream;
+	copier.csb->inheritViewFlags(newSource->stream, csb_no_dbkey);
 
 	if (newSource->recursive)
 	{
-		oldStream = mapStream;
-		fb_assert(oldStream <= MAX_STREAMS);
-		newStream = copier.csb->nextStream();
-		newSource->mapStream = newStream;
-		copier.remap[oldStream] = newStream;
-		CMP_csb_element(copier.csb, newStream);
-	}
+		newSource->mapStream = copier.csb->nextStream();
+		copier.remap[mapStream] = newSource->mapStream;
+		CMP_csb_element(copier.csb, newSource->mapStream);
 
-	copier.csb->csb_rpt[newStream].csb_flags |=
-		copier.csb->csb_rpt[oldStream].csb_flags & csb_no_dbkey;
+		copier.csb->inheritViewFlags(newSource->mapStream, csb_no_dbkey);
+	}
 
 	const NestConst<RseNode>* ptr = clauses.begin();
 	const NestConst<MapNode>* ptr2 = maps.begin();
@@ -1816,7 +1806,6 @@ void UnionSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, RseNode
 
 	CompilerScratch::csb_repeat* const element = CMP_csb_element(csb, stream);
 	element->csb_view = parentView;
-	fb_assert(viewStream <= MAX_STREAMS);
 	element->csb_view_stream = viewStream;
 }
 
@@ -1851,7 +1840,6 @@ RecordSourceNode* UnionSourceNode::pass2(thread_db* tdbb, CompilerScratch* csb)
 
 void UnionSourceNode::pass2Rse(thread_db* tdbb, CompilerScratch* csb)
 {
-	fb_assert(stream <= MAX_STREAMS);
 	csb->csb_rpt[stream].activate();
 
 	pass2(tdbb, csb);
@@ -2044,15 +2032,14 @@ WindowSourceNode* WindowSourceNode::copy(thread_db* tdbb, NodeCopier& copier) co
 		 inputPartition != partitions.end();
 		 ++inputPartition)
 	{
-		fb_assert(inputPartition->stream <= MAX_STREAMS);
-
 		Partition& copyPartition = newSource->partitions.add();
 
 		copyPartition.stream = copier.csb->nextStream();
-		// fb_assert(copyPartition.stream <= MAX_UCHAR);
 
 		copier.remap[inputPartition->stream] = copyPartition.stream;
 		CMP_csb_element(copier.csb, copyPartition.stream);
+
+		copier.csb->inheritViewFlags(copyPartition.stream, csb_no_dbkey);
 
 		if (inputPartition->group)
 			copyPartition.group = inputPartition->group->copy(tdbb, copier);
@@ -2077,7 +2064,6 @@ RecordSourceNode* WindowSourceNode::pass1(thread_db* tdbb, CompilerScratch* csb)
 		 partition != partitions.end();
 		 ++partition)
 	{
-		fb_assert(partition->stream <= MAX_STREAMS);
 		csb->csb_rpt[partition->stream].csb_flags |= csb_no_dbkey;
 	}
 
@@ -2106,7 +2092,6 @@ void WindowSourceNode::pass1Source(thread_db* tdbb, CompilerScratch* csb, RseNod
 
 	jrd_rel* const parentView = csb->csb_view;
 	const StreamType viewStream = csb->csb_view_stream;
-	fb_assert(viewStream <= MAX_STREAMS);
 
 	for (ObjectsArray<Partition>::iterator partition = partitions.begin();
 		 partition != partitions.end();
@@ -2129,8 +2114,6 @@ RecordSourceNode* WindowSourceNode::pass2(thread_db* tdbb, CompilerScratch* csb)
 		ExprNode::doPass2(tdbb, csb, partition->map.getAddress());
 		ExprNode::doPass2(tdbb, csb, partition->group.getAddress());
 		ExprNode::doPass2(tdbb, csb, partition->order.getAddress());
-
-		fb_assert(partition->stream <= MAX_STREAMS);
 
 		processMap(tdbb, csb, partition->map, &csb->csb_rpt[partition->stream].csb_internal_format);
 		csb->csb_rpt[partition->stream].csb_format =

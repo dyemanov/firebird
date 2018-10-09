@@ -369,7 +369,9 @@ void IDX_create_index(thread_db* tdbb,
 		if (!VIO_garbage_collect(tdbb, &primary, transaction))
 			continue;
 
-		if (primary.rpb_flags & rpb_deleted)
+		const bool deleted = primary.rpb_flags & rpb_deleted;
+
+		if (deleted)
 			CCH_RELEASE(tdbb, &primary.getWindow(tdbb));
 		else
 		{
@@ -486,7 +488,7 @@ void IDX_create_index(thread_db* tdbb,
 			index_sort_record* isr = (index_sort_record*) p;
 			isr->isr_record_number = primary.rpb_number.getValue();
 			isr->isr_key_length = key.key_length;
-			isr->isr_flags = (stack.hasData() ? ISR_secondary : 0) | (key_is_null ? ISR_null : 0);
+			isr->isr_flags = ((stack.hasData() || deleted) ? ISR_secondary : 0) | (key_is_null ? ISR_null : 0);
 			if (record != gc_record)
 				delete record;
 		}

@@ -46,7 +46,7 @@ for select rdb$user_name, rdb$first_name, rdb$middle_name, rdb$last_name, rdb$ui
 into :usr, :frst, :mddl, :lst, :uid, :gid, :passwd
 do begin
 	-- basic fields
-	sql = 'create or alter user ' || usr || ' password ''' || passwd || '''';
+	sql = 'create or alter user "' || usr || '" password ''' || passwd || '''';
 	if (frst is not null) then sql = sql || ' firstname ''' || frst || '''';
 	if (mddl is not null) then sql = sql || ' middlename ''' || mddl || '''';
 	if (lst is not null) then sql = sql || ' lastname ''' || lst || '''';

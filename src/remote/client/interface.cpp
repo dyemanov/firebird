@@ -1596,7 +1596,7 @@ void Attachment::freeClientData(CheckStatusWrapper* status, bool force)
 	{
 		CHECK_HANDLE(rdb, isc_bad_db_handle);
 		rem_port* port = rdb->rdb_port;
-		RefMutexGuard portGuard(*port->port_sync, FB_FUNCTION);
+		RemotePortGuard portGuard(port, FB_FUNCTION);
 
 		try
 		{
@@ -1613,7 +1613,8 @@ void Attachment::freeClientData(CheckStatusWrapper* status, bool force)
 			// telling the user that an unrecoverable network error occurred and that
 			// if there was any uncommitted work, its gone......  Oh well....
 			ex.stuffException(status);
-			if ((status->getErrors()[1] != isc_network_error) && (!force))
+			
+			if (!fb_utils::isNetworkError(status->getErrors()[1]) && (!force))
 			{
 				return;
 			}
@@ -1690,7 +1691,7 @@ void Attachment::dropDatabase(CheckStatusWrapper* status)
 
 		CHECK_HANDLE(rdb, isc_bad_db_handle);
 		rem_port* port = rdb->rdb_port;
-		RefMutexGuard portGuard(*port->port_sync, FB_FUNCTION);
+		RemotePortGuard portGuard(port, FB_FUNCTION);
 
 		try
 		{
@@ -3934,15 +3935,6 @@ void Attachment::putSlice(CheckStatusWrapper* status, ITransaction* apiTra, ISC_
 }
 
 
-namespace {
-	void portEventsShutdown(rem_port* port)
-	{
-		if (port->port_events_thread)
-			Thread::waitForCompletion(port->port_events_thread);
-	}
-}
-
-
 Firebird::IEvents* Attachment::queEvents(CheckStatusWrapper* status, Firebird::IEventCallback* callback,
 									 unsigned int length, const unsigned char* events)
 {
@@ -3982,11 +3974,11 @@ Firebird::IEvents* Attachment::queEvents(CheckStatusWrapper* status, Firebird::I
 			receive_response(status, rdb, packet);
 			port->connect(packet);
 
-			Thread::start(event_thread, port->port_async, THREAD_high,
-						  &port->port_async->port_events_thread);
-			port->port_async->port_events_shutdown = portEventsShutdown;
+			rem_port* port_async = port->port_async;
+			port_async->port_events_threadId = 
+				Thread::start(event_thread, port_async, THREAD_high, &port_async->port_events_thread);
 
-			port->port_async->port_context = rdb;
+			port_async->port_context = rdb;
 		}
 
 		// Add event block to port's list of active remote events
@@ -4714,7 +4706,7 @@ void Service::freeClientData(CheckStatusWrapper* status, bool force)
 
 		CHECK_HANDLE(rdb, isc_bad_svc_handle);
 		rem_port* port = rdb->rdb_port;
-		RefMutexGuard portGuard(*port->port_sync, FB_FUNCTION);
+		RemotePortGuard portGuard(port, FB_FUNCTION);
 
 		try
 		{
@@ -5396,6 +5388,11 @@ static void secureAuthentication(ClntAuthBlock& cBlock, rem_port* port)
 
 		if (st.getState() & Firebird::IStatus::STATE_ERRORS)
 			status_exception::raise(&st);
+	}
+	else
+	{
+		// try to start crypt
+		cBlock.tryNewKeys(port);
 	}
 }
 
@@ -7449,18 +7446,103 @@ static void cleanDpb(Firebird::ClumpletWriter& dpb, const ParametersSet* tags)
 
 } //namespace Remote
 
+
+RmtAuthBlock::RmtAuthBlock(const Firebird::AuthReader::AuthBlock& aBlock)
+	: rdr(*getDefaultMemoryPool(), aBlock), info(*getDefaultMemoryPool())
+{
+	LocalStatus ls;
+	CheckStatusWrapper st(&ls);
+	first(&st);
+	check(&st);
+}
+
+const char* RmtAuthBlock::getType()
+{
+	return info.type.nullStr();
+}
+
+const char* RmtAuthBlock::getName()
+{
+	return info.name.nullStr();
+}
+
+const char* RmtAuthBlock::getPlugin()
+{
+	return info.plugin.nullStr();
+}
+
+const char* RmtAuthBlock::getSecurityDb()
+{
+	return info.secDb.nullStr();
+}
+
+const char* RmtAuthBlock::getOriginalPlugin()
+{
+	return info.origPlug.nullStr();
+}
+
+FB_BOOLEAN RmtAuthBlock::next(Firebird::CheckStatusWrapper* status)
+{
+	try
+	{
+		rdr.moveNext();
+		return loadInfo();
+	}
+	catch (const Exception& ex)
+	{
+		ex.stuffException(status);
+	}
+	return FB_FALSE;
+}
+
+FB_BOOLEAN RmtAuthBlock::first(Firebird::CheckStatusWrapper* status)
+{
+	try
+	{
+		rdr.rewind();
+		return loadInfo();
+	}
+	catch (const Exception& ex)
+	{
+		ex.stuffException(status);
+	}
+	return FB_FALSE;
+}
+
+FB_BOOLEAN RmtAuthBlock::loadInfo()
+{
+	if (rdr.isEof())
+		return FB_FALSE;
+	rdr.getInfo(info);
+	return FB_TRUE;
+}
+
+
 ClntAuthBlock::ClntAuthBlock(const Firebird::PathName* fileName, Firebird::ClumpletReader* dpb,
 							 const ParametersSet* tags)
 	: pluginList(getPool()), serverPluginList(getPool()),
 	  cliUserName(getPool()), cliPassword(getPool()), cliOrigUserName(getPool()),
 	  dataForPlugin(getPool()), dataFromPlugin(getPool()),
-	  cryptKeys(getPool()), dpbConfig(getPool()),
+	  cryptKeys(getPool()), dpbConfig(getPool()), dpbPlugins(getPool()),
 	  hasCryptKey(false), plugins(IPluginManager::TYPE_AUTH_CLIENT),
 	  authComplete(false), firstTime(true)
 {
-	if (dpb && tags && dpb->find(tags->config_text))
+	if (dpb && tags)
 	{
-		dpb->getString(dpbConfig);
+		if (dpb->find(tags->config_text))
+		{
+			dpb->getString(dpbConfig);
+		}
+		if (dpb->find(tags->plugin_list))
+		{
+			dpb->getPath(dpbPlugins);
+		}
+		if (dpb->find(tags->auth_block))
+		{
+			AuthReader::AuthBlock plain;
+			plain.add(dpb->getBytes(), dpb->getClumpLength());
+			remAuthBlock.reset(FB_NEW RmtAuthBlock(plain));
+		}
 	}
 	resetClnt(fileName);
 }
@@ -7489,6 +7571,7 @@ void ClntAuthBlock::extractDataFromPluginTo(Firebird::ClumpletWriter& dpb,
 			{
 				dpb.insertPath(tags->plugin_name, pluginName);
 			}
+			dpb.deleteWithTag(tags->plugin_list);
 			dpb.insertPath(tags->plugin_list, pluginList);
 			firstTime = false;
 			HANDSHAKE_DEBUG(fprintf(stderr,
@@ -7603,6 +7686,11 @@ const char* ClntAuthBlock::getLogin()
 const char* ClntAuthBlock::getPassword()
 {
 	return cliPassword.nullStr();
+}
+
+IAuthBlock* ClntAuthBlock::getAuthBlock(CheckStatusWrapper* status)
+{
+	return remAuthBlock;
 }
 
 const unsigned char* ClntAuthBlock::getData(unsigned int* length)

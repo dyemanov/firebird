@@ -228,6 +228,14 @@ typedef struct dsc
 		memset(this, 0, sizeof(*this));
 	}
 
+	void clearFlags()
+	{
+		if (isBlob() && dsc_sub_type == isc_blob_text)
+			dsc_flags &= 0xFF00;
+		else
+			dsc_flags = 0;
+	}
+
 	void makeBlob(SSHORT subType, USHORT ttype, ISC_QUAD* address = NULL)
 	{
 		clear();

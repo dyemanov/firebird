@@ -270,6 +270,7 @@ class CryptoManager FB_FINAL : public Firebird::PermanentStorage, public BarSync
 {
 public:
 	typedef Firebird::GetPlugins<Firebird::IDbCryptPlugin> Factory;
+	typedef Firebird::HalfStaticArray<Attachment*, 16> AttVector;
 
 	explicit CryptoManager(thread_db* tdbb);
 	~CryptoManager();
@@ -302,6 +303,7 @@ public:
 
 	ULONG getCurrentPage() const;
 	UCHAR getCurrentState() const;
+	const char* getKeyName() const;
 
 private:
 	enum IoResult {SUCCESS_ALL, FAILED_CRYPT, FAILED_IO};
@@ -323,33 +325,6 @@ private:
 
 	private:
 		char buf[MAX_PAGE_SIZE + PAGE_ALIGNMENT - 1];
-	};
-
-	class KeyHolderPlugins
-	{
-	public:
-		typedef CryptoManager::Factory Factory;
-
-		explicit KeyHolderPlugins(Firebird::MemoryPool& p, CryptoManager* m)
-			: knownHolders(p), mgr(m)
-		{ }
-
-		void attach(Attachment* att, const Config* config);
-		void init(Firebird::IDbCryptPlugin* crypt, const Firebird::MetaName& keyName);
-		bool validateNewAttachment(Attachment*, const Firebird::MetaName& keyName);
-		void validateExistingAttachments(const Firebird::MetaName& keyName);
-		void detach(Attachment* att);
-
-	private:
-		Firebird::Mutex holdersMutex;
-		typedef Firebird::Pair<Firebird::Right<Attachment*,
-			Firebird::HalfStaticArray<Firebird::IKeyHolderPlugin*, 4> > > PerAttHolders;
-		Firebird::ObjectsArray<PerAttHolders> knownHolders;
-		CryptoManager* mgr;
-
-		bool validateHoldersGroup(PerAttHolders& pa, const Firebird::MetaName& keyName);
-		bool validateHolder(Firebird::IKeyHolderPlugin* keyHolder, const Firebird::MetaName& keyName);
-		void releaseHolders(PerAttHolders& pa);
 	};
 
 	class DbInfo;
@@ -391,10 +366,12 @@ private:
 	void doOnAst(thread_db* tdbb);
 
 	void loadPlugin(thread_db* tdbb, const char* pluginName);
+	bool internalAttach(thread_db* tdbb, Attachment* att, bool consume);
 	ULONG getLastPage(thread_db* tdbb);
 	void writeDbHeader(thread_db* tdbb, ULONG runpage);
 	void calcValidation(Firebird::string& valid, Firebird::IDbCryptPlugin* plugin);
 	void checkValidation();
+	void shutdownConsumers(thread_db* tdbb);
 
 	void lockAndReadHeader(thread_db* tdbb, unsigned flags = 0);
 	static const unsigned CRYPT_HDR_INIT =		0x01;
@@ -408,8 +385,8 @@ private:
 	BarSync sync;
 	Firebird::MetaName keyName;
 	ULONG currentPage;
-	Firebird::Mutex pluginLoadMtx, cryptThreadMtx;
-	KeyHolderPlugins keyHolderPlugins;
+	Firebird::Mutex pluginLoadMtx, cryptThreadMtx, holdersMutex;
+	AttVector keyProviders, keyConsumers;
 	Firebird::string hash;
 	Firebird::RefPtr<DbInfo> dbInfo;
 	Thread::Handle cryptThreadId;

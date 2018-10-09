@@ -345,6 +345,7 @@ void SortedStream::mapData(thread_db* tdbb, jrd_req* request, UCHAR* data) const
 		}
 
 		record_param* const rpb = &request->req_rpb[item->stream];
+		jrd_rel* const relation = rpb->rpb_relation;
 
 		const SSHORT id = item->fieldId;
 
@@ -365,7 +366,14 @@ void SortedStream::mapData(thread_db* tdbb, jrd_req* request, UCHAR* data) const
 				fb_assert(false);
 			}
 
-			rpb->rpb_runtime_flags |= RPB_refetch;
+			if (relation &&
+				!relation->rel_file &&
+				!relation->rel_view_rse &&
+				!relation->isVirtual())
+			{
+				rpb->rpb_runtime_flags |= RPB_refetch;
+			}
+
 			continue;
 		}
 
@@ -380,8 +388,8 @@ void SortedStream::mapData(thread_db* tdbb, jrd_req* request, UCHAR* data) const
 			// dimitr:	I've added the check for !isValid to ensure that we don't overwrite
 			//			the format for an active rpb (i.e. the one having some record fetched).
 			//			See CORE-3806 for example.
-			if (rpb->rpb_relation && !rpb->rpb_number.isValid())
-				VIO_record(tdbb, rpb, MET_current(tdbb, rpb->rpb_relation), tdbb->getDefaultPool());
+			if (relation && !rpb->rpb_number.isValid())
+				VIO_record(tdbb, rpb, MET_current(tdbb, relation), tdbb->getDefaultPool());
 		}
 
 		Record* const record = rpb->rpb_record;

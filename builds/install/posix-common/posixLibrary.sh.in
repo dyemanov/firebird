@@ -223,6 +223,8 @@ checkLibraries() {
 	then
 		checkLibrary tommath
 	fi
+
+	checkLibrary icudata
 }
 
 
@@ -290,7 +292,7 @@ removeInetdServiceEntry() {
 grepProcess() {
 	processList=$1
 	eol=\$
-	ps $psOptions | egrep "\<($processList)($eol|[[:space:]])" | grep -v grep
+	ps $psOptions | egrep "\<($processList)($eol|[[:space:]])" | grep -v grep | grep -v -w '\-path'
 }
 
 

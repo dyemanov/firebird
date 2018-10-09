@@ -987,7 +987,8 @@ void ClntAuthBlock::resetClnt(const Firebird::PathName* fileName, const CSTRING*
 	firstTime = true;
 
 	clntConfig = REMOTE_get_config(fileName, &dpbConfig);
-	pluginList = clntConfig->getPlugins(Firebird::IPluginManager::TYPE_AUTH_CLIENT);
+	pluginList = dpbPlugins.hasData() ? dpbPlugins :
+		clntConfig->getPlugins(Firebird::IPluginManager::TYPE_AUTH_CLIENT);
 
 	Firebird::PathName final;
 	if (serverPluginList.hasData())
@@ -1334,7 +1335,7 @@ namespace {
 #else
 			const char* name = "libz." SHRLIB_EXT ".1";
 #endif
-			z.reset(ModuleLoader::fixAndLoadModule(name));
+			z.reset(ModuleLoader::fixAndLoadModule(NULL, name));
 			if (z)
 				symbols();
 		}
@@ -1381,11 +1382,6 @@ namespace {
 
 rem_port::~rem_port()
 {
-	if (port_events_shutdown)
-	{
-		port_events_shutdown(this);
-	}
-
 	delete port_srv_auth;
 	delete port_srv_auth_block;
 	delete port_version;

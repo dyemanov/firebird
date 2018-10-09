@@ -3261,12 +3261,12 @@ interface is main interface of database crypt key holder plugin.</font></p>
 	<li/>
 <p style="margin-bottom: 0in"><font size="4" style="font-size: 14pt">FB_BOOLEAN
 	useOnlyOwnKeys(StatusType* status) – informs firebird engine
-	whether a key, provided by another key holder, be used or not. Makes
-	sense only for SuperServer – only it can share database crypt keys
+	whether a key, provided by key holder, can be used in other attachments.
+	Makes sense only for SuperServer – only it can share database crypt keys
 	between attachments. Returning FB_TRUE from this method enforces
 	firebird to make sure that this particular key holder (and therefore
-	in turn attachment related to it) provides correct crypt key before
-	letting it to work with database.</font></p>
+	in turn attachment related to it) provides correct crypt key for
+	any other attachment to this database.</font></p>
 	<li/>
 <p style="margin-bottom: 0in"><font size="4" style="font-size: 14pt">ICryptKeyCallback*
 	chainHandle(StatusType* status) – support of a chain of key

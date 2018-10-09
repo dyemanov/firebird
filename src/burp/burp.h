@@ -50,21 +50,6 @@
 #endif
 
 
-static inline UCHAR* BURP_alloc(ULONG size)
-{
-	return MISC_alloc_burp(size);
-}
-
-static inline UCHAR* BURP_alloc_zero(ULONG size)
-{
-	return MISC_alloc_burp(size);
-}
-
-static inline void BURP_free(void* block)
-{
-	MISC_free_burp(block);
-}
-
 const int GDS_NAME_LEN		= METADATA_IDENTIFIER_CHAR_LEN * 4 /* max bytes per char */ + 1;
 typedef TEXT			GDS_NAME[GDS_NAME_LEN];
 
@@ -903,12 +888,36 @@ public:
 
 // Global switches and data
 
-class BurpGlobals : public Firebird::ThreadData
+class GblPool
+{
+private:
+	// Moved it to separate class in order to ensure 'first create/last destroy' order
+	Firebird::MemoryPool* gbl_pool;
+public:
+	Firebird::MemoryPool& getPool()
+	{
+		fb_assert(gbl_pool);
+		return *gbl_pool;
+	}
+
+	explicit GblPool(bool ownPool)
+		: gbl_pool(ownPool ? MemoryPool::createPool(getDefaultMemoryPool()) : getDefaultMemoryPool())
+	{ }
+
+	~GblPool()
+	{
+		if (gbl_pool != getDefaultMemoryPool())
+			Firebird::MemoryPool::deletePool(gbl_pool);
+	}
+};
+
+class BurpGlobals : public Firebird::ThreadData, public GblPool
 {
 public:
 	explicit BurpGlobals(Firebird::UtilSvc* us)
 		: ThreadData(ThreadData::tddGBL),
-		  defaultCollations(*getDefaultMemoryPool()),
+		  GblPool(us->isService()),
+		  defaultCollations(getPool()),
 		  uSvc(us),
 		  verboseInterval(10000),
 		  flag_on_line(true),
@@ -918,15 +927,14 @@ public:
 		// this is VERY dirty hack to keep current behaviour
 		memset (&gbl_database_file_name, 0,
 			&veryEnd - reinterpret_cast<char*>(&gbl_database_file_name));
-		memset(status_vector, 0, sizeof(status_vector));
 
+		// normal code follows
 		gbl_stat_flags = 0;
 		gbl_stat_header = false;
 		gbl_stat_done = false;
 		memset(gbl_stats, 0, sizeof(gbl_stats));
 		gbl_stats[TIME_TOTAL] = gbl_stats[TIME_DELTA] = fb_utils::query_performance_counter();
 
-		// normal code follows
 		exit_code = FINI_ERROR;	// prevent FINI_OK in case of unknown error thrown
 								// would be set to FINI_OK (==0) in exit_local
 	}
@@ -1151,5 +1159,22 @@ enum burp_messages_vals {
 
 // BLOB buffer
 typedef Firebird::HalfStaticArray<UCHAR, 1024> BlobBuffer;
+
+static inline UCHAR* BURP_alloc(ULONG size)
+{
+	BurpGlobals* tdgbl = BurpGlobals::getSpecific();
+	return (UCHAR*)(tdgbl->getPool().allocate(size ALLOC_ARGS));
+}
+
+static inline UCHAR* BURP_alloc_zero(ULONG size)
+{
+	BurpGlobals* tdgbl = BurpGlobals::getSpecific();
+	return (UCHAR*)(tdgbl->getPool().calloc(size ALLOC_ARGS));
+}
+
+static inline void BURP_free(void* block)
+{
+	MemoryPool::globalFree(block);
+}
 
 #endif // BURP_BURP_H

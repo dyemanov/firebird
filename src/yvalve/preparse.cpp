@@ -170,9 +170,9 @@ bool PREPARSE_execute(CheckStatusWrapper* status, Why::YAttachment** ptrAtt,
 		}
 
 		bool hasUser = true;
+		status->init();
 		for (int qStrip = 0; qStrip < 2; ++qStrip)
 		{
-			status->init();
 			hasUser = false;
 
 			Tokens tks;
@@ -297,7 +297,8 @@ bool PREPARSE_execute(CheckStatusWrapper* status, Why::YAttachment** ptrAtt,
 	}
 	catch (const Exception& ex)
 	{
-		ex.stuffException(status);
+		if (!(status->getState() & IStatus::STATE_ERRORS))
+			ex.stuffException(status);
 		return true;
 	}
 

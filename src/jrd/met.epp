@@ -2262,7 +2262,7 @@ BlobFilter* MET_lookup_filter(thread_db* tdbb, SSHORT from, SSHORT to)
 		X.RDB$OUTPUT_SUB_TYPE EQ to
 	{
 		filter = (FPTR_BFILTER_CALLBACK)
-			Module::lookup(X.RDB$MODULE_NAME, X.RDB$ENTRYPOINT, dbb->dbb_modules);
+			Module::lookup(X.RDB$MODULE_NAME, X.RDB$ENTRYPOINT, dbb);
 		if (filter)
 		{
 			blf = FB_NEW_POOL(*dbb->dbb_permanent) BlobFilter(*dbb->dbb_permanent);

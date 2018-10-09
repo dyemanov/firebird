@@ -12,7 +12,7 @@ HDRS	      = defs.h mstring.h
 # across all of our supported compilers/platforms.
 
 # Vanilla CFLAGS
-CFLAGS=
+#CFLAGS=
 
 # No LDFLAGS
 #LDFLAGS=

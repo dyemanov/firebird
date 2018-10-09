@@ -201,6 +201,12 @@ void TraceCfgReader::readConfig()
 		if (!match)
 			continue;
 
+		if (!section->sub)
+		{
+			fatal_exception::raiseFmt(ERROR_PREFIX
+				"Trace parameters are not present");
+		}
+
 		const ConfigFile::Parameters& elements = section->sub->getParameters();
 		for (FB_SIZE_T p = 0; p < elements.getCount(); ++p)
 		{

@@ -109,7 +109,7 @@ public:
 	}
 
 private:
-	AutoPtr<FILE, FileClose> file;
+	AutoPtr<FILE> file;
 	Firebird::PathName fileName;
 	unsigned int l;
 };
@@ -275,11 +275,12 @@ ConfigFile::Stream::~Stream()
  *	Parse line, taking quotes into account
  */
 
-ConfigFile::LineType ConfigFile::parseLine(const char* fileName, const String& input, Parameter& par)
+ConfigFile::LineType ConfigFile::parseLine(const char* fileName, const String& inputPar, Parameter& par)
 {
 	int inString = 0;
 	String::size_type valStart = 0;
 	String::size_type eol = String::npos;
+	String input = inputPar;
 	bool hasSub = false;
 	const char* include = "include";
 	const unsigned incLen = static_cast<unsigned>(strlen(include));
@@ -346,7 +347,12 @@ ConfigFile::LineType ConfigFile::parseLine(const char* fileName, const String& i
 
 		case '{':
 		case '}':
-			if (flags & HAS_SUB_CONF)
+			if (n < input.length() - 1 && input[n + 1] == input[n])
+			{
+				input.erase(n, 1);
+				break;
+			}
+			else if (flags & HAS_SUB_CONF)
 			{
 				if (inString != 1)
 				{

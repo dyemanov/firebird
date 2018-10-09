@@ -395,7 +395,22 @@ void EXE_assignment(thread_db* tdbb, const ValueExprNode* to, dsc* from_desc, bo
 		{
 			// ASF: Don't let MOV_move call blb::move because MOV
 			// will not pass the destination field to blb::_move.
-			blb::move(tdbb, from_desc, to_desc, to);
+
+			record_param* rpb = NULL;
+			USHORT fieldId = 0;
+			if (to)
+			{
+				const FieldNode* toField = ExprNode::as<FieldNode>(to);
+				if (toField)
+				{
+					fieldId = toField->fieldId;
+					rpb = &request->req_rpb[toField->fieldStream];
+				}
+				else if (!(ExprNode::is<ParameterNode>(to) || ExprNode::is<VariableNode>(to)))
+					BUGCHECK(199);	// msg 199 expected field node
+			}
+
+			blb::move(tdbb, from_desc, to_desc, rpb, fieldId);
 		}
 		else if (!DSC_EQUIV(from_desc, to_desc, false))
 		{
@@ -690,6 +705,10 @@ void EXE_receive(thread_db* tdbb,
 						current->bli_request->req_blobs.fastRemove();
 						current->bli_request = NULL;
 					}
+				}
+				else
+				{
+					transaction->checkBlob(tdbb, id, false);
 				}
 			}
 		}

@@ -977,7 +977,7 @@ void TracePluginImpl::appendServiceQueryParams(size_t send_item_length,
 				break;
 
 			case isc_info_svc_get_env_lock:
-				recv_query.printf(NEWLINE "\t\t retrieve the setting of $FIREBIRD_LCK");
+				recv_query.printf(NEWLINE "\t\t retrieve the setting of $FIREBIRD_LOCK");
 				break;
 
 			case isc_info_svc_get_env_msg:

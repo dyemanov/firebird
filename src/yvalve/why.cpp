@@ -1109,7 +1109,7 @@ namespace Why
 	{
 	public:
 		YEntry(CheckStatusWrapper* aStatus, Y* object, int checkAttachment = 1)
-			: ref(object->attachment), nextRef(NULL)
+			: ref(object->attachment.get()), nextRef(NULL)
 		{
 			aStatus->init();
 			init(object->next);
@@ -1123,7 +1123,7 @@ namespace Why
 			if (checkAttachment && ref && ref->savedStatus.getError())
 			{
 				fini();
-				status_exception::raise(object->attachment->savedStatus.value());
+				status_exception::raise(object->attachment.get()->savedStatus.value());
 			}
 		}
 
@@ -1140,10 +1140,12 @@ namespace Why
 			{
 				MutexLockGuard guard(ref->enterMutex, FB_FUNCTION);
 				++ref->enterCount;
+				nextRef = nxt;
 			}
 			else
 			{
 				++dispCounter;
+				nextRef = nxt;
 			}
 
 			if (shutdownStarted)
@@ -1151,22 +1153,21 @@ namespace Why
 				fini();
 				Arg::Gds(isc_att_shutdown).raise();
 			}
-
-			nextRef = nxt;
 		}
 
 		void fini()
 		{
 			RefDeb(DEB_RLS_JATT, "YEntry::fini");
-			nextRef = NULL;
 
 			if (ref)
 			{
 				MutexLockGuard guard(ref->enterMutex, FB_FUNCTION);
+				nextRef = NULL;
 				--ref->enterCount;
 			}
 			else
 			{
+				nextRef = NULL;
 				--dispCounter;
 			}
 		}
@@ -1190,8 +1191,8 @@ namespace Why
 		static const ISC_STATUS ERROR_CODE = isc_bad_stmt_handle;
 
 		explicit IscStatement(YAttachment* aAttachment)
-			: cursorName(getPool()),
-			attachment(aAttachment),
+			: attachment(aAttachment),
+			cursorName(getPool()),
 			statement(NULL),
 			userHandle(NULL),
 			pseudoOpened(false),
@@ -1229,8 +1230,8 @@ namespace Why
 				Arg::Gds(isc_dsql_cursor_open_err).raise();
 		}
 
+		AtomicAttPtr attachment;
 		string cursorName;
-		YAttachment* attachment;
 		YStatement* statement;
 		FB_API_HANDLE* userHandle;
 		bool pseudoOpened, delayedFormat;
@@ -1325,7 +1326,7 @@ static void badHandle(ISC_STATUS code)
 static bool isNetworkError(const IStatus* status)
 {
 	ISC_STATUS code = status->getErrors()[1];
-	return code == isc_network_error || code == isc_net_write_err || code == isc_net_read_err;
+	return fb_utils::isNetworkError(code);
 }
 
 static void nullCheck(const FB_API_HANDLE* ptr, ISC_STATUS code)
@@ -1635,7 +1636,7 @@ ISC_STATUS API_ROUTINE isc_cancel_events(ISC_STATUS* userStatus, FB_API_HANDLE* 
 			throw;
 		}
 
-		if (event->attachment != attachment)
+		if (event->attachment.get() != attachment)
 			Arg::Gds(isc_bad_events_handle).raise();
 
 		event->cancel(&statusWrapper);
@@ -2550,7 +2551,7 @@ ISC_STATUS API_ROUTINE isc_dsql_prepare(ISC_STATUS* userStatus, FB_API_HANDLE* t
 		if (traHandle && *traHandle)
 			transaction = translateHandle(transactions, traHandle);
 
-		statement->statement = statement->attachment->prepare(&statusWrapper, transaction,
+		statement->statement = statement->attachment.get()->prepare(&statusWrapper, transaction,
 			stmtLength, sqlStmt, dialect, IStatement::PREPARE_PREFETCH_METADATA);
 
 		if (!(status.getState() & Firebird::IStatus::STATE_ERRORS))
@@ -2602,7 +2603,7 @@ ISC_STATUS API_ROUTINE isc_dsql_prepare_m(ISC_STATUS* userStatus, FB_API_HANDLE*
 		unsigned flags = StatementMetadata::buildInfoFlags(
 			itemLength, reinterpret_cast<const UCHAR*>(items));
 
-		statement->statement = statement->attachment->prepare(&statusWrapper, transaction,
+		statement->statement = statement->attachment.get()->prepare(&statusWrapper, transaction,
 			stmtLength, sqlStmt, dialect, flags);
 
 		if (!(status.getState() & Firebird::IStatus::STATE_ERRORS))
@@ -3750,12 +3751,9 @@ YHelper<Impl, Intf>::YHelper(NextInterface* aNext)
 
 
 YEvents::YEvents(YAttachment* aAttachment, IEvents* aNext, IEventCallback* aCallback)
-	: YHelper(aNext)
+	: YHelper(aNext), attachment(aAttachment), callback(aCallback)
 {
-	attachment = aAttachment;
-	callback = aCallback;
-
-	attachment->childEvents.add(this);
+	aAttachment->childEvents.add(this);
 }
 
 FB_API_HANDLE& YEvents::getHandle()
@@ -3767,8 +3765,9 @@ FB_API_HANDLE& YEvents::getHandle()
 
 void YEvents::destroy(unsigned dstrFlags)
 {
-	attachment->childEvents.remove(this);
-	attachment = NULL;
+	YAttachment* att = attachment.release();
+	if (att)
+		att->childEvents.remove(this);
 	removeHandle(&events, handle);
 
 	if (!(dstrFlags & DF_RELEASE))
@@ -3793,6 +3792,9 @@ void YEvents::cancel(CheckStatusWrapper* status)
 
 		entry.next()->cancel(status);
 
+		if (status->getErrors()[1] == isc_att_shutdown)
+			status->init();
+
 		if (!(status->getState() & Firebird::IStatus::STATE_ERRORS))
 			destroy(DF_RELEASE);
 	}
@@ -3811,7 +3813,7 @@ YRequest::YRequest(YAttachment* aAttachment, IRequest* aNext)
 	  attachment(aAttachment),
 	  userHandle(NULL)
 {
-	attachment->childRequests.add(this);
+	attachment.get()->childRequests.add(this);
 }
 
 FB_API_HANDLE& YRequest::getHandle()
@@ -3829,8 +3831,9 @@ void YRequest::destroy(unsigned dstrFlags)
 		userHandle = NULL;
 	}
 
-	attachment->childRequests.remove(this);
-	attachment = NULL;
+	YAttachment* att = attachment.release();
+	if (att)
+		att->childRequests.remove(this);
 
 	removeHandle(&requests, handle);
 
@@ -3886,7 +3889,7 @@ void YRequest::start(CheckStatusWrapper* status, ITransaction* transaction, int 
 		YEntry<YRequest> entry(status, this);
 
 		NextTransaction trans;
-		attachment->getNextTransaction(status, transaction, trans);
+		attachment.get()->getNextTransaction(status, transaction, trans);
 		entry.next()->start(status, trans, level);
 	}
 	catch (const Exception& e)
@@ -3903,7 +3906,7 @@ void YRequest::startAndSend(CheckStatusWrapper* status, ITransaction* transactio
 		YEntry<YRequest> entry(status, this);
 
 		NextTransaction trans;
-		attachment->getNextTransaction(status, transaction, trans);
+		attachment.get()->getNextTransaction(status, transaction, trans);
 		entry.next()->startAndSend(status, trans, level, msgType, length, message);
 	}
 	catch (const Exception& e)
@@ -3951,8 +3954,8 @@ YBlob::YBlob(YAttachment* aAttachment, YTransaction* aTransaction, IBlob* aNext)
 	  attachment(aAttachment),
 	  transaction(aTransaction)
 {
-	attachment->childBlobs.add(this);
-	transaction->childBlobs.add(this);
+	aAttachment->childBlobs.add(this);
+	aTransaction->childBlobs.add(this);
 }
 
 FB_API_HANDLE& YBlob::getHandle()
@@ -3964,13 +3967,15 @@ FB_API_HANDLE& YBlob::getHandle()
 
 void YBlob::destroy(unsigned dstrFlags)
 {
-	attachment->childBlobs.remove(this);
-	attachment = NULL;
-	transaction->childBlobs.remove(this);
-	transaction = NULL;
+	YAttachment* att = attachment.release();
+	if (att)
+		att->childBlobs.remove(this);
+
+	YTransaction* tra = transaction.release();
+	if (tra)
+		tra->childBlobs.remove(this);
 
 	removeHandle(&blobs, handle);
-
 	destroy2(dstrFlags);
 }
 
@@ -4074,7 +4079,7 @@ YStatement::YStatement(YAttachment* aAttachment, IStatement* aNext)
 	: YHelper(aNext),
 	  attachment(aAttachment), cursor(NULL), input(true), output(false)
 {
-	attachment->childStatements.add(this);
+	attachment.get()->childStatements.add(this);
 }
 
 void YStatement::destroy(unsigned dstrFlags)
@@ -4088,8 +4093,9 @@ void YStatement::destroy(unsigned dstrFlags)
 		}
 	}
 
-	attachment->childStatements.remove(this);
-	attachment = NULL;
+	YAttachment* att = attachment.release();
+	if (att)
+		att->childStatements.remove(this);
 
 	destroy2(dstrFlags);
 }
@@ -4245,7 +4251,7 @@ ITransaction* YStatement::execute(CheckStatusWrapper* status, ITransaction* tran
 
 		NextTransaction trans;
 		if (transaction)
-			attachment->getNextTransaction(status, transaction, trans);
+			attachment.get()->getNextTransaction(status, transaction, trans);
 
 		ITransaction* newTrans = entry.next()->execute(status, trans, inMetadata, inBuffer,
 			outMetadata, outBuffer);
@@ -4264,7 +4270,7 @@ ITransaction* YStatement::execute(CheckStatusWrapper* status, ITransaction* tran
 
 			if (newTrans)
 			{
-				newTrans = FB_NEW YTransaction(attachment, newTrans);
+				newTrans = FB_NEW YTransaction(attachment.get(), newTrans);
 				newTrans->addRef();
 			}
 		}
@@ -4288,7 +4294,7 @@ IResultSet* YStatement::openCursor(Firebird::CheckStatusWrapper* status, ITransa
 
 		NextTransaction trans;
 		if (transaction)
-			attachment->getNextTransaction(status, transaction, trans);
+			attachment.get()->getNextTransaction(status, transaction, trans);
 
 		IResultSet* rs = entry.next()->openCursor(status, trans, inMetadata, inBuffer, outMetadata, flags);
 		if (status->getState() & Firebird::IStatus::STATE_ERRORS)
@@ -4297,9 +4303,9 @@ IResultSet* YStatement::openCursor(Firebird::CheckStatusWrapper* status, ITransa
 		}
 		fb_assert(rs);
 
-		YTransaction* const yTra = attachment->getTransaction(status, transaction);
+		YTransaction* const yTra = attachment.get()->getTransaction(status, transaction);
 
-		YResultSet* r = FB_NEW YResultSet(attachment, yTra, this, rs);
+		YResultSet* r = FB_NEW YResultSet(attachment.get(), yTra, this, rs);
 		r->addRef();
 		return r;
 	}
@@ -4345,8 +4351,10 @@ IscStatement::~IscStatement()
 
 void IscStatement::destroy(unsigned)
 {
-	attachment->childIscStatements.remove(this);
-	attachment = NULL;
+	YAttachment* att = attachment.release();
+	if (att)
+		att->childIscStatements.remove(this);
+
 	release();
 }
 
@@ -4462,7 +4470,7 @@ YResultSet::YResultSet(YAttachment* anAttachment, YTransaction* aTransaction, IR
 	  statement(NULL)
 {
 	fb_assert(aTransaction && aNext);
-	transaction->childCursors.add(this);
+	aTransaction->childCursors.add(this);
 }
 
 YResultSet::YResultSet(YAttachment* anAttachment, YTransaction* aTransaction,
@@ -4473,7 +4481,7 @@ YResultSet::YResultSet(YAttachment* anAttachment, YTransaction* aTransaction,
 	  statement(aStatement)
 {
 	fb_assert(aTransaction && aNext);
-	transaction->childCursors.add(this);
+	aTransaction->childCursors.add(this);
 
 	MutexLockGuard guard(statement->statementMutex, FB_FUNCTION);
 
@@ -4492,9 +4500,9 @@ void YResultSet::destroy(unsigned dstrFlags)
 		statement->cursor = NULL;
 	}
 
-	fb_assert(transaction);
-	transaction->childCursors.remove(this);
-	transaction = NULL;
+	YTransaction* tra = transaction.release();
+	if (tra)
+		tra->childCursors.remove(this);
 
 	destroy2(dstrFlags);
 }
@@ -4699,8 +4707,8 @@ YTransaction::YTransaction(YAttachment* aAttachment, ITransaction* aNext)
 	  childCursors(getPool()),
 	  cleanupHandlers(getPool())
 {
-	if (attachment)
-		attachment->childTransactions.add(this);
+	if (aAttachment)
+		aAttachment->childTransactions.add(this);
 }
 
 FB_API_HANDLE& YTransaction::getHandle()
@@ -4724,11 +4732,9 @@ void YTransaction::destroy(unsigned dstrFlags)
 	childBlobs.destroy(dstrFlags & ~DF_RELEASE);
 	childCursors.destroy(dstrFlags & ~DF_RELEASE);
 
-	if (attachment)
-	{
-		attachment->childTransactions.remove(this);
-		attachment = NULL;
-	}
+	YAttachment* att = attachment.release();
+	if (att)
+		att->childTransactions.remove(this);
 
 	removeHandle(&transactions, handle);
 
@@ -4745,7 +4751,7 @@ void YTransaction::getInfo(CheckStatusWrapper* status, unsigned int itemsLength,
 		YEntry<YTransaction> entry(status, this);
 
 		fb_utils::getDbPathInfo(itemsLength, items, bufferLength, buffer,
-								newItemsBuffer, attachment->dbPath);
+								newItemsBuffer, attachment.get()->dbPath);
 
 		entry.next()->getInfo(status, itemsLength, items, bufferLength, buffer);
 	}
@@ -4906,7 +4912,7 @@ ITransaction* YTransaction::validate(CheckStatusWrapper* status, IAttachment* te
 		YEntry<YTransaction> entry(status, this);
 
 		// Do not raise error in status - just return NULL if attachment does not match
-		if (attachment == testAtt)
+		if (attachment.get() == testAtt)
 			return this;
 
 		return entry.next()->validate(status, testAtt);
@@ -4931,11 +4937,9 @@ YTransaction* YTransaction::enterDtc(CheckStatusWrapper* status)
 		copy->addRef();
 		next->addRef();		// We use NoIncr in YTransaction ctor
 
-		if (attachment)
-		{
-			attachment->childTransactions.remove(this);
-			attachment = NULL;
-		}
+		YAttachment* att = attachment.release();
+		if (att)
+			att->childTransactions.remove(this);
 
 		removeHandle(&transactions, handle);
 		next = NULL;
@@ -5456,6 +5460,9 @@ void YAttachment::detach(CheckStatusWrapper* status)
 
 		if (entry.next())
 			entry.next()->detach(status);
+
+		if (isNetworkError(status))
+			status->init();
 
 		if (!(status->getState() & Firebird::IStatus::STATE_ERRORS))
 			destroy(DF_RELEASE);

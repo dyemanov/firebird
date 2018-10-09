@@ -60,6 +60,7 @@
 #include "../jrd/tra_proto.h"
 #include "../jrd/vio_proto.h"
 #include "../jrd/jrd_proto.h"
+#include "../jrd/scl_proto.h"
 #include "../common/classes/ClumpletWriter.h"
 #include "../common/classes/TriState.h"
 #include "../common/utils_proto.h"
@@ -834,13 +835,13 @@ void TRA_update_counters(thread_db* tdbb, Database* dbb)
 	{
 		CCH_MARK_MUST_WRITE(tdbb, &window);
 
-		if (dbb->dbb_oldest_active > header->hdr_oldest_active)
+		if (dbb->dbb_oldest_active > oldest_active)
 			Ods::writeOAT(header, dbb->dbb_oldest_active);
 
-		if (dbb->dbb_oldest_transaction > header->hdr_oldest_transaction)
+		if (dbb->dbb_oldest_transaction > oldest_transaction)
 			Ods::writeOIT(header, dbb->dbb_oldest_transaction);
 
-		if (dbb->dbb_oldest_snapshot > header->hdr_oldest_snapshot)
+		if (dbb->dbb_oldest_snapshot > oldest_snapshot)
 			Ods::writeOST(header, dbb->dbb_oldest_snapshot);
 
 		if (dbb->dbb_next_transaction > next_transaction)
@@ -1237,6 +1238,9 @@ void TRA_release_transaction(thread_db* tdbb, jrd_tra* transaction, Jrd::TraceTr
 	} // end scope
 
 	// Release the locks associated with the transaction
+
+	if (transaction->tra_alter_db_lock)
+		LCK_release(tdbb, transaction->tra_alter_db_lock);
 
 	vec<Lock*>* vector = transaction->tra_relation_locks;
 	if (vector)
@@ -3232,7 +3236,7 @@ static void transaction_start(thread_db* tdbb, jrd_tra* trans)
 	// of four, which puts the transaction on a byte boundary.
 
 	TraNumber base = oldest & ~TRA_MASK;
-	const ULONG top = (dbb->dbb_flags & DBB_read_only) ? 
+	const TraNumber top = (dbb->dbb_flags & DBB_read_only) ?
 		dbb->dbb_next_transaction : number;
 
 	if (!(trans->tra_flags & TRA_read_committed) && (top >= oldest))
@@ -3626,6 +3630,83 @@ void jrd_tra::releaseAutonomousPool(MemoryPool* toRelease)
 	}
 }
 
+
+void jrd_tra::checkBlob(thread_db* tdbb, const bid* blob_id, bool punt)
+{
+	USHORT rel_id = blob_id->bid_internal.bid_relation_id;
+	if ((tra_attachment->isGbak()) ||
+		tra_attachment->att_flags & ATT_garbage_collector ||
+		tra_attachment->att_user->locksmith() ||
+		rel_id == 0)
+	{
+		return;
+	}
+
+	if (!tra_blobs->locate(blob_id->bid_temp_id()) && 
+		!tra_fetched_blobs.locate(*blob_id))
+	{
+		vec<jrd_rel*>* vector = tra_attachment->att_relations;
+		jrd_rel* blb_relation;
+		if (rel_id < vector->count() &&	(blb_relation = (*vector)[rel_id]))
+		{
+			if (blb_relation->rel_security_name.isEmpty())
+				MET_scan_relation(tdbb, blb_relation);
+			SecurityClass* s_class = SCL_get_class(tdbb, blb_relation->rel_security_name.c_str());
+
+			if (!s_class)
+				return;
+
+			switch (s_class->scl_blb_access)
+			{
+			case SecurityClass::BA_UNKNOWN:
+				// Relation has not been checked for access rights
+				try
+				{
+					ThreadStatusGuard status_vector(tdbb);
+
+					SCL_check_access(tdbb, s_class, 0, 0, NULL, SCL_select, SCL_object_table, false,
+						blb_relation->rel_name);
+					s_class->scl_blb_access = SecurityClass::BA_SUCCESS;
+				}
+				catch (const Exception& ex)
+				{
+					StaticStatusVector status;
+					ex.stuffException(status);
+					if (status[1] != isc_no_priv)
+						throw;
+
+					// We don't have access to this relation
+					s_class->scl_blb_access = SecurityClass::BA_FAILURE;
+
+					if (punt)
+						throw;
+
+					// but someone else has (SP, view)
+					// store Blob ID as allowed in this transaction
+					tra_fetched_blobs.add(*blob_id);
+				}
+				break;
+						
+			case SecurityClass::BA_FAILURE:
+				// Relation has been checked earlier and check was failed
+				if (punt)
+					ERR_post(Arg::Gds(isc_no_priv) << Arg::Str("SELECT") <<
+						Arg::Str("TABLE") <<
+						Arg::Str(blb_relation->rel_name));
+				else
+					tra_fetched_blobs.add(*blob_id);
+				break;
+
+			case SecurityClass::BA_SUCCESS:
+				// do nothing
+				break;
+
+			default:
+				fb_assert(false);
+			}
+		}
+	}
+}
 
 /// class TraceSweepEvent
 

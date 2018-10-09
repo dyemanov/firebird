@@ -23,9 +23,14 @@
 #ifndef ODS_PROTO_H
 #define ODS_PROTO_H
 
+namespace Firebird {
+	class DbImplementation;
+}
+
 namespace Ods {
 
-	bool isSupported(USHORT, USHORT);
+	bool isSupported(const header_page* hdr);
+	SINT64* getGpgValues(generator_page* page, Firebird::DbImplementation impl, USHORT minorVersion);
 
 	// NS: ODS code logic should never depend on host platform pointer size.
 	// this is why data type for these things is ULONG (32-bit unsigned integer)

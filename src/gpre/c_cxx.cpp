@@ -2820,7 +2820,7 @@ static void gen_request(const gpre_req* request)
 		printa(0, "static %sshort\n   isc_%dl = %d;",
 			   (request->req_flags & REQ_extend_dpb) ? "" : CONST_STR,
 			   request->req_ident, request->req_length);
-		printa(0, "static %schar\n   isc_%d [] = {", CONST_STR, request->req_ident);
+		printa(0, "static %sunsigned char\n   isc_%d [] = {", CONST_STR, request->req_ident);
 
 		const TEXT* string_type = "blr";
 		if (gpreGlob.sw_raw)

@@ -226,13 +226,7 @@ void PPG_print_header(const header_page* header, ULONG page,
 			temp[p[1]] = '\0';
 			uSvc->printf(false, "\tRoot file name:\t\t%s\n", temp);
 			break;
-/*
-		case HDR_journal_server:
-			memcpy(temp, p + 2, p[1]);
-			temp[p[1]] = '\0';
-			uSvc->printf(false, "\tJournal server:\t\t%s\n", temp);
-			break;
-*/
+
 		case HDR_file:
 			memcpy(temp, p + 2, p[1]);
 			temp[p[1]] = '\0';
@@ -243,30 +237,12 @@ void PPG_print_header(const header_page* header, ULONG page,
 			memcpy(&number, p + 2, sizeof(number));
 			uSvc->printf(false, "\tLast logical page:\t\t%ld\n", number);
 			break;
-/*
-		case HDR_unlicensed:
-			memcpy(&number, p + 2, sizeof(number));
-			uSvc->printf(false, "\tUnlicensed accesses:\t\t%ld\n", number);
-			break;
-*/
+
 		case HDR_sweep_interval:
 			memcpy(&number, p + 2, sizeof(number));
 			uSvc->printf(false, "\tSweep interval:\t\t%ld\n", number);
 			break;
 
-/*
-		case HDR_log_name:
-			memcpy(temp, p + 2, p[1]);
-			temp[p[1]] = '\0';
-			uSvc->printf(false, "\tReplay logging file:\t\t%s\n", temp);
-			break;
-
-		case HDR_cache_file:
-			memcpy(temp, p + 2, p[1]);
-			temp[p[1]] = '\0';
-			uSvc->printf(false, "\tShared Cache file:\t\t%s\n", temp);
-			break;
-*/
 		case HDR_difference_file:
 			memcpy(temp, p + 2, p[1]);
 			temp[p[1]] = '\0';
@@ -287,6 +263,10 @@ void PPG_print_header(const header_page* header, ULONG page,
 
 		case HDR_crypt_hash:
 			uSvc->printf(false, "\tKey hash:\t%*.*s\n", p[1], p[1], p + 2);
+			break;
+
+		case HDR_crypt_checksum:
+			uSvc->printf(false, "\tCrypt checksum:\t%*.*s\n", p[1], p[1], p + 2);
 			break;
 
 		default:

@@ -187,6 +187,33 @@ bool DbImplementation::compatible(const DbImplementation& v) const
 	return di_flags == v.di_flags;
 }
 
+bool DbImplementation::ods12_1_gen() const
+{
+	if ((di_cpu == CpuAmd || di_cpu == CpuIntel) && di_os == OsWindows && di_cc == CcMsvc)
+		return true;
+
+	if (di_cpu == CpuAmd && di_os == OsLinux && di_cc == CcGcc)
+		return true;
+
+	return false;
+}
+
+bool DbImplementation::ods12_0_gen() const
+{
+	if (di_cpu == CpuIntel && di_os == OsLinux && di_cc == CcGcc)
+		return true;
+
+	return false;
+}
+
+bool DbImplementation::same() const
+{
+	if (di_cpu == current.di_cpu && di_os == current.di_os && di_cc == current.di_cc)
+		return true;
+
+	return false;
+}
+
 void DbImplementation::store(Ods::header_page* h) const
 {
 	h->hdr_cpu = di_cpu;

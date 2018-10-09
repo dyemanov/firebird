@@ -340,7 +340,8 @@ class CurrentTimeNode : public TypedNode<ValueExprNode, ExprNode::TYPE_CURRENT_T
 public:
 	CurrentTimeNode(MemoryPool& pool, unsigned aPrecision)
 		: TypedNode<ValueExprNode, ExprNode::TYPE_CURRENT_TIME>(pool),
-		  precision(aPrecision)
+		  precision(aPrecision),
+		  dsqlLocal(false)
 	{
 	}
 
@@ -359,6 +360,7 @@ public:
 
 public:
 	unsigned precision;
+	bool dsqlLocal;
 };
 
 
@@ -367,7 +369,8 @@ class CurrentTimeStampNode : public TypedNode<ValueExprNode, ExprNode::TYPE_CURR
 public:
 	CurrentTimeStampNode(MemoryPool& pool, unsigned aPrecision)
 		: TypedNode<ValueExprNode, ExprNode::TYPE_CURRENT_TIMESTAMP>(pool),
-		  precision(aPrecision)
+		  precision(aPrecision),
+		  dsqlLocal(false)
 	{
 	}
 
@@ -386,6 +389,7 @@ public:
 
 public:
 	unsigned precision;
+	bool dsqlLocal;
 };
 
 

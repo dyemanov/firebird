@@ -666,7 +666,7 @@ public:
 		  inputs(NULL),
 		  outputs(NULL),
 		  useCallerPrivs(false),
-		  traScope(EDS::TraScope(0)),	// not defined
+		  traScope(EDS::traNotSet),	// not defined
 		  inputNames(NULL)
 	{
 	}

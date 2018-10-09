@@ -64,7 +64,7 @@
 
 #include <string.h>
 
-#if (defined SOLARIS || defined LINUX || defined AIX_PPC || defined FREEBSD || defined NETBSD || defined HPUX)
+#if (defined SOLARIS || defined LINUX || defined DARWIN || defined AIX_PPC || defined FREEBSD || defined NETBSD || defined HPUX)
 #define DYNAMIC_SHARED_LIBRARIES
 #endif
 
@@ -113,11 +113,7 @@ namespace {
 		{MOD_SUFFIX, "." SHRLIB_EXT, true},
 		{MOD_PREFIX, "lib", true},
 #endif
-/*
-#ifdef DARWIN
-		{MOD_SUFFIX, ".dylib", true},
-#endif
-*/
+
 	};
 
 	// UDF/BLOB filter verifier
@@ -165,7 +161,7 @@ namespace Jrd
 	}
 
 
-	FPTR_INT Module::lookup(const char* module, const char* name, DatabaseModules& interest)
+	FPTR_INT Module::lookup(const char* module, const char* name, Database* dbb)
 	{
 		// Try to find loadable module
 		Module m = lookupModule(module);
@@ -178,12 +174,7 @@ namespace Jrd
 		terminate_at_space(symbol, name);
 		void* rc = m.lookupSymbol(symbol);
 		if (rc)
-		{
-			if (!interest.exist(m))
-			{
-				interest.add(m);
-			}
-		}
+			dbb->registerModule(m);
 
 		return (FPTR_INT)rc;
 	}
@@ -254,7 +245,7 @@ namespace Jrd
 															 Arg::Str(initialModule));
 			}
 
-			ModuleLoader::Module* mlm = ModuleLoader::loadModule(fixedModule);
+			ModuleLoader::Module* mlm = ModuleLoader::loadModule(NULL, fixedModule);
 			if (mlm)
 			{
 				im = FB_NEW_POOL(*getDefaultMemoryPool())

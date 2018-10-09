@@ -149,7 +149,7 @@ MonitoringData::~MonitoringData()
 {
 	Guard guard(this);
 
-	if (shared_memory->getHeader()->used == sizeof(Header))
+	if (shared_memory->getHeader()->used == alignOffset(sizeof(Header)))
 		shared_memory->removeMapFile();
 }
 
@@ -1011,12 +1011,11 @@ void Monitoring::putRequest(SnapshotData::DumpRecord& record, const jrd_req* req
 	if (request->req_attachment)
 		record.storeInteger(f_mon_stmt_att_id, request->req_attachment->att_attachment_id);
 	// state, transaction ID, timestamp
-	if (request->req_flags & req_active)
+	if (request->req_transaction && (request->req_flags & req_active))
 	{
 		const bool is_stalled = (request->req_flags & req_stall);
 		record.storeInteger(f_mon_stmt_state, is_stalled ? mon_state_stalled : mon_state_active);
-		if (request->req_transaction)
-			record.storeInteger(f_mon_stmt_tra_id, request->req_transaction->tra_number);
+		record.storeInteger(f_mon_stmt_tra_id, request->req_transaction->tra_number);
 		record.storeTimestamp(f_mon_stmt_timestamp, request->req_timestamp);
 	}
 	else
@@ -1106,6 +1105,7 @@ void Monitoring::putCall(SnapshotData::DumpRecord& record, const jrd_req* reques
 	putMemoryUsage(record, request->req_memory_stats, stat_id, stat_call);
 }
 
+
 void Monitoring::putStatistics(SnapshotData::DumpRecord& record, const RuntimeStatistics& statistics,
 							   int stat_id, int stat_group)
 {
@@ -1176,6 +1176,7 @@ void Monitoring::putStatistics(SnapshotData::DumpRecord& record, const RuntimeSt
 	}
 }
 
+
 void Monitoring::putContextVars(SnapshotData::DumpRecord& record, const StringMap& variables,
 								SINT64 object_id, bool is_attachment)
 {
@@ -1194,6 +1195,7 @@ void Monitoring::putContextVars(SnapshotData::DumpRecord& record, const StringMa
 		record.write();
 	}
 }
+
 
 void Monitoring::putMemoryUsage(SnapshotData::DumpRecord& record, const MemoryStats& stats,
 								int stat_id, int stat_group)
@@ -1242,8 +1244,7 @@ void Monitoring::dumpAttachment(thread_db* tdbb, Attachment* attachment)
 	const AttNumber att_id = attachment->att_attachment_id;
 	const string& user_name = attachment->att_user->usr_user_name;
 
-	if (!dbb->dbb_monitoring_data)
-		dbb->dbb_monitoring_data = FB_NEW_POOL(pool) MonitoringData(dbb);
+	fb_assert(dbb->dbb_monitoring_data);
 
 	MonitoringData::Guard guard(dbb->dbb_monitoring_data);
 	dbb->dbb_monitoring_data->cleanup(att_id);
@@ -1306,14 +1307,14 @@ void Monitoring::publishAttachment(thread_db* tdbb)
 	Database* const dbb = tdbb->getDatabase();
 	Attachment* const attachment = tdbb->getAttachment();
 
-	if (!dbb->dbb_monitoring_data)
-		dbb->dbb_monitoring_data = FB_NEW_POOL(*dbb->dbb_permanent) MonitoringData(dbb);
-
 	const string& user_name = attachment->att_user->usr_user_name;
+
+	fb_assert(dbb->dbb_monitoring_data);
 
 	MonitoringData::Guard guard(dbb->dbb_monitoring_data);
 	dbb->dbb_monitoring_data->setup(attachment->att_attachment_id, user_name.c_str());
 }
+
 
 void Monitoring::cleanupAttachment(thread_db* tdbb)
 {

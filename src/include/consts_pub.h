@@ -347,7 +347,7 @@
 #define isc_info_svc_capabilities		57	/* Retrieves a bitmask representing the server's capabilities */
 #define isc_info_svc_user_dbpath		58	/* Retrieves the path to the security database in use by the server */
 #define isc_info_svc_get_env			59	/* Retrieves the setting of $FIREBIRD */
-#define isc_info_svc_get_env_lock		60	/* Retrieves the setting of $FIREBIRD_LCK */
+#define isc_info_svc_get_env_lock		60	/* Retrieves the setting of $FIREBIRD_LOCK */
 #define isc_info_svc_get_env_msg		61	/* Retrieves the setting of $FIREBIRD_MSG */
 #define isc_info_svc_line				62	/* Retrieves 1 line of service output per call */
 #define isc_info_svc_to_eof				63	/* Retrieves as much of the server output as will fit in the supplied buffer */

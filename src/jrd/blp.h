@@ -241,5 +241,10 @@ static const struct
 	{"subfunc", function},
 	{"record_version2", byte_line},
 	{"gen_id2", gen_id2}, // 210
+	{0, 0},
+	{0, 0},
+	{0, 0},
+	{"local_timestamp", byte_line},
+	{"local_time", byte_line},
 	{0, 0}
 };

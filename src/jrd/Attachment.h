@@ -521,6 +521,16 @@ public:
 		}
 	}
 
+	bool isEmpty() const
+	{
+		return m_attachments.isEmpty();
+	}
+
+	bool hasData() const
+	{
+		return m_attachments.hasData();
+	}
+
 	void add(StableAttachmentPart* jAtt)
 	{
 		if (jAtt)

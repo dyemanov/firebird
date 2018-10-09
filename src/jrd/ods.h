@@ -33,8 +33,10 @@
 #ifndef JRD_ODS_H
 #define JRD_ODS_H
 
+#ifndef ODS_TESTING
 #include "../jrd/RecordNumber.h"
 #include "../common/classes/fb_string.h"
+#endif	//ODS_TESTING
 
 // This macro enables the ability of the engine to connect to databases
 // from ODS 8 up to the latest.  If this macro is undefined, the engine
@@ -117,7 +119,9 @@ const USHORT ODS_VERSION12	= 12;		// Firebird 3.x features
 // Minor versions for ODS 12
 
 const USHORT ODS_CURRENT12_0	= 0;	// Firebird 3.0 features
-const USHORT ODS_CURRENT12		= 0;
+const USHORT ODS_CURRENT12_1	= 1;	// Skipped due to Avalerion's blunder
+const USHORT ODS_CURRENT12_2	= 2;	// Fix for generator page for linux/x86
+const USHORT ODS_CURRENT12		= 2;
 
 // useful ODS macros. These are currently used to flag the version of the
 // system triggers and system indices in ini.e
@@ -137,6 +141,8 @@ const USHORT ODS_11_0		= ENCODE_ODS(ODS_VERSION11, 0);
 const USHORT ODS_11_1		= ENCODE_ODS(ODS_VERSION11, 1);
 const USHORT ODS_11_2		= ENCODE_ODS(ODS_VERSION11, 2);
 const USHORT ODS_12_0		= ENCODE_ODS(ODS_VERSION12, 0);
+//const USHORT ODS_12_1		= ENCODE_ODS(ODS_VERSION12, 1);		// Skipped due to Avalerion's blunder
+const USHORT ODS_12_2		= ENCODE_ODS(ODS_VERSION12, 2);
 
 const USHORT ODS_FIREBIRD_FLAG = 0x8000;
 
@@ -164,7 +170,7 @@ const USHORT ODS_RELEASED = ODS_CURRENT12_0;	// The lowest stable minor version
 const USHORT ODS_CURRENT = ODS_CURRENT12;		// The highest defined minor version
 												// number for this ODS_VERSION!
 
-const USHORT ODS_CURRENT_VERSION = ODS_12_0;	// Current ODS version in use which includes
+const USHORT ODS_CURRENT_VERSION = ODS_12_2;	// Current ODS version in use which includes
 												// both major and minor ODS versions!
 
 
@@ -309,7 +315,9 @@ struct index_root_page
 	USHORT irt_count;				// Number of indices
 	struct irt_repeat
 	{
+#ifndef ODS_TESTING
 	private:
+#endif	//ODS_TESTING
 		ULONG irt_root;				// page number of index root if irt_in_progress is NOT set, or
 									// highest 32 bit of transaction if irt_in_progress is set
 		ULONG irt_transaction;		// transaction in progress (lowest 32 bits)
@@ -318,6 +326,7 @@ struct index_root_page
 		UCHAR irt_keys;				// number of keys in index
 		UCHAR irt_flags;
 
+#ifndef ODS_TESTING
 		ULONG getRoot() const;
 		void setRoot(ULONG root_page);
 
@@ -325,6 +334,7 @@ struct index_root_page
 		void setTransaction(TraNumber traNumber);
 
 		bool isUsed() const;
+#endif	//ODS_TESTING
 	} irt_rpt[1];
 };
 
@@ -345,6 +355,7 @@ const USHORT irt_foreign		= 8;
 const USHORT irt_primary		= 16;
 const USHORT irt_expression		= 32;
 
+#ifndef ODS_TESTING
 inline ULONG index_root_page::irt_repeat::getRoot() const
 {
 	return (irt_flags & irt_in_progress) ? 0 : irt_root;
@@ -372,6 +383,7 @@ inline bool index_root_page::irt_repeat::isUsed() const
 {
 	return (irt_flags & irt_in_progress) || (irt_root != 0);
 }
+#endif	//ODS_TESTING
 
 
 const int STUFF_COUNT		= 4;
@@ -561,6 +573,7 @@ struct generator_page
 {
 	pag gpg_header;
 	ULONG gpg_sequence;			// Sequence number
+	ULONG gpg_dummy1;			// Alignment enforced
 	SINT64 gpg_values[1];		// Generator vector
 };
 
@@ -696,7 +709,9 @@ inline int IAD_LEN(int count)
 #define IAD_LEN(count)	(sizeof (Ods::InternalArrayDesc) + \
 	(count ? count - 1: count) * sizeof (Ods::InternalArrayDesc::iad_repeat))
 
+#ifndef ODS_TESTING
 Firebird::string pagtype(UCHAR type);
+#endif	//ODS_TESTING
 
 } //namespace Ods
 

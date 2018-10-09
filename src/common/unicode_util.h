@@ -31,6 +31,10 @@
 #include "../common/IntlUtil.h"
 #include "../common/os/mod_loader.h"
 #include "../common/classes/fb_string.h"
+
+#undef U_SHOW_CPLUSPLUS_API
+#define U_SHOW_CPLUSPLUS_API 0
+
 #include <unicode/ucnv.h>
 
 struct UCollator;

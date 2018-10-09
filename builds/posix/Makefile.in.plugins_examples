@@ -28,7 +28,7 @@
 #  Adriano dos Santos Fernandes
 #
 
-ROOT=$(shell cd ../..; pwd)
+ROOT=$(shell cd ..; pwd)
 
 ifeq ($(IsDeveloper), Y)
   DefaultTarget := Debug
@@ -50,19 +50,12 @@ include     $(ROOT)/gen/make.shared.variables
 @SET_MAKE@
 
 
-# Override make.defaults
-LINK_PLUGIN_SYMBOLS = $(call LIB_LINK_MAPFILE,../$(PLUGIN_VERS))
-
-
 .PHONY: all udrcpp_example dc_example kh_example crypt_app
 
 all: udrcpp_example dc_example kh_example crypt_app
 
 
-UDR_Objects = $(call makeObjects,../examples/udr,Functions.cpp)	\
-	$(call makeObjects,../examples/udr,Procedures.cpp)	\
-	$(call makeObjects,../examples/udr,Triggers.cpp)
-
+UDR_Objects = $(call dirObjects,../examples/udr)
 UDR_Plugin = $(PLUGINS)/udr/$(LIB_PREFIX)udrcpp_example.$(SHRLIB_EXT)
 AllObjects = $(UDR_Objects)
 

@@ -102,6 +102,10 @@ $(OBJ)/%.o: $(SRC_ROOT)/%.cpp
 	$(CXX) $(WCXXFLAGS) -c $(firstword $<) -o $@
 	@sed $(INLINE_EDIT_SED) -e "1,2s/:/: \$$(wildcard/" -e "\$$s/\(.*\)/\\1)/" $(patsubst %.o,%.d,$@)
 
+$(OBJ)/%.o: $(ROOT)/%.cpp
+	$(CC) $(WCFLAGS) -c $(firstword $<) -o $@
+	@sed $(INLINE_EDIT_SED) -e "1,2s/:/: \$$(wildcard/" -e "\$$s/\(.*\)/\\1)/" $(patsubst %.o,%.d,$@)
+
 .SUFFIXES: .epp .e
 
 # Rules for making resource files

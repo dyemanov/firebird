@@ -221,15 +221,18 @@ void IscConnection::doDetach(thread_db* tdbb)
 	}
 }
 
-bool IscConnection::cancelExecution()
+bool IscConnection::cancelExecution(bool forced)
 {
 	FbLocalStatus status;
 
 	if (m_handle)
 	{
-		m_iscProvider.fb_cancel_operation(&status, &m_handle, fb_cancel_raise);
+		m_iscProvider.fb_cancel_operation(&status, &m_handle, 
+			forced ? fb_cancel_abort : fb_cancel_raise);
 
-		if (m_handle && (status->getErrors()[1] == isc_wish_list))
+		if (!forced && m_handle && 
+			(status->getState() & IStatus::STATE_ERRORS) && 
+			(status->getErrors()[1] != isc_bad_db_handle))
 		{
 			status->init();
 			m_iscProvider.fb_cancel_operation(&status, &m_handle, fb_cancel_abort);
@@ -1608,15 +1611,8 @@ void FBProvider::loadAPI()
 
 static bool isConnectionBrokenError(FbStatusVector* status)
 {
-	switch (status->getErrors()[1])
-	{
-	case isc_att_shutdown:
-	case isc_network_error:
-	case isc_net_read_err:
-	case isc_net_write_err:
-		return true;
-	}
-	return false;
+	ISC_STATUS code = status->getErrors()[1];
+	return (fb_utils::isNetworkError(code) || code == isc_att_shutdown);
 }
 
 

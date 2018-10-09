@@ -36,7 +36,7 @@ UDRPLUGLOC=$(CURDIR)/Release/firebird/plugins/udr/
 NEWUDRPLUGLOC=/Library/Frameworks/Firebird.framework/Resources/plugins/udr
 INTLLOC=$(CURDIR)/Release/firebird/intl/
 NEWINTLLOC=/Library/Frameworks/Firebird.framework/Resources/plugins/
-OLDFBCLIENT=$(CURDIR)/Release/firebird/lib/libfbclient.dylib.3.0.3
+OLDFBCLIENT=$(CURDIR)/Release/firebird/lib/libfbclient.dylib.3.0.4
 NEWFBCLIENT=/Library/Frameworks/Firebird.framework/Versions/A/Firebird
 
 bin:

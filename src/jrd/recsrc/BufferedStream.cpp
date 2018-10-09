@@ -234,7 +234,15 @@ bool BufferedStream::getRecord(thread_db* tdbb) const
 			const FieldMap& map = m_map[i];
 
 			record_param* const rpb = &request->req_rpb[map.map_stream];
-			rpb->rpb_runtime_flags |= RPB_refetch;
+			jrd_rel* const relation = rpb->rpb_relation;
+
+			if (relation &&
+				!relation->rel_file &&
+				!relation->rel_view_rse &&
+				!relation->isVirtual())
+			{
+				rpb->rpb_runtime_flags |= RPB_refetch;
+			}
 
 			if (map.map_stream != stream)
 			{
@@ -243,14 +251,14 @@ bool BufferedStream::getRecord(thread_db* tdbb) const
 				// See SortedStream::mapData() for explanations why we need
 				// to upgrade the record format
 
-				if (rpb->rpb_relation && !rpb->rpb_number.isValid())
-					VIO_record(tdbb, rpb, MET_current(tdbb, rpb->rpb_relation), tdbb->getDefaultPool());
+				if (relation && !rpb->rpb_number.isValid())
+					VIO_record(tdbb, rpb, MET_current(tdbb, relation), tdbb->getDefaultPool());
 			}
 
 			Record* const record = rpb->rpb_record;
 			record->reset();
 
-			if (!EVL_field(rpb->rpb_relation, buffer_record, (USHORT) i, &from))
+			if (!EVL_field(relation, buffer_record, (USHORT) i, &from))
 			{
 				fb_assert(map.map_type == FieldMap::REGULAR_FIELD);
 				record->setNull(map.map_id);
@@ -261,7 +269,7 @@ bool BufferedStream::getRecord(thread_db* tdbb) const
 			{
 			case FieldMap::REGULAR_FIELD:
 				{
-					EVL_field(rpb->rpb_relation, record, map.map_id, &to);
+					EVL_field(relation, record, map.map_id, &to);
 					MOV_move(tdbb, &from, &to);
 					record->clearNull(map.map_id);
 				}

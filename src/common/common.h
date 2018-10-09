@@ -997,4 +997,7 @@ namespace Firebird {
 	static IMessageMetadata* const DELAYED_OUT_FORMAT = reinterpret_cast<IMessageMetadata*>(1);
 }
 
+#undef UCHAR_TYPE
+#define UCHAR_TYPE uint16_t
+
 #endif /* COMMON_COMMON_H */

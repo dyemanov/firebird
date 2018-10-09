@@ -34,7 +34,7 @@ using namespace Firebird;
 
 namespace Auth {
 
-class SrpClient FB_FINAL : public StdPlugin<IClientImpl<SrpClient, CheckStatusWrapper> >
+class SrpClient : public StdPlugin<IClientImpl<SrpClient, CheckStatusWrapper> >
 {
 public:
 	explicit SrpClient(IPluginConfig*)
@@ -55,6 +55,20 @@ private:
 	RemotePassword* client;
 	string data;
 	UCharBuffer sessionKey;
+protected:
+    virtual RemotePassword* RemotePasswordFactory()=0;
+};
+
+template <class SHA> class SrpClientImpl FB_FINAL : public SrpClient  
+{
+public:
+	explicit SrpClientImpl<SHA>(IPluginConfig* ipc)
+	  : SrpClient(ipc) {}
+protected:
+    RemotePassword* RemotePasswordFactory()
+    {
+		return FB_NEW RemotePasswordImpl<SHA>;
+	}
 };
 
 int SrpClient::authenticate(CheckStatusWrapper* status, IClientBlock* cb)
@@ -76,7 +90,7 @@ int SrpClient::authenticate(CheckStatusWrapper* status, IClientBlock* cb)
 				return AUTH_CONTINUE;
 			}
 
-			client = FB_NEW RemotePassword;
+			client = RemotePasswordFactory();
 			client->genClientKey(data);
 			dumpIt("Clnt: clientPubKey", data);
 			cb->putData(status, data.length(), data.begin());
@@ -130,7 +144,7 @@ int SrpClient::authenticate(CheckStatusWrapper* status, IClientBlock* cb)
 
 		BigInteger cProof = client->clientProof(cb->getLogin(), salt.c_str(), sessionKey);
 		cProof.getText(data);
-
+        	dumpIt("Clnt: Client Proof",cProof);
 		cb->putData(status, data.length(), data.c_str());
 		if (status->getState() & IStatus::STATE_ERRORS)
 		{
@@ -170,12 +184,20 @@ int SrpClient::release()
 
 namespace
 {
-	SimpleFactory<SrpClient> factory;
+	SimpleFactory<SrpClientImpl<Sha1> > factory_sha1;
+	SimpleFactory<SrpClientImpl<sha224> > factory_sha224;
+	SimpleFactory<SrpClientImpl<sha256> > factory_sha256;
+	SimpleFactory<SrpClientImpl<sha384> > factory_sha384;
+	SimpleFactory<SrpClientImpl<sha512> > factory_sha512;
 }
 
 void registerSrpClient(IPluginManager* iPlugin)
 {
-	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_CLIENT, RemotePassword::plugName, &factory);
+	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_CLIENT, RemotePassword::plugName, &factory_sha1);
+	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_CLIENT, RemotePassword::pluginName(224).c_str(), &factory_sha224);
+	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_CLIENT, RemotePassword::pluginName(256).c_str(), &factory_sha256);
+	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_CLIENT, RemotePassword::pluginName(384).c_str(), &factory_sha384);
+	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_CLIENT, RemotePassword::pluginName(512).c_str(), &factory_sha512);
 }
 
 } // namespace Auth

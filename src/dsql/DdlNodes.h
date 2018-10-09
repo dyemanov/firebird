@@ -1926,6 +1926,7 @@ public:
 	MappingNode(MemoryPool& p, OP o, const Firebird::MetaName& nm)
 		: DdlNode(p),
 		  name(p, nm),
+		  fromUtf8(p),
 		  plugin(NULL),
 		  db(NULL),
 		  fromType(NULL),
@@ -1955,10 +1956,11 @@ protected:
 	void runInSecurityDb(SecDbContext* secDbContext);
 
 private:
-	void addItem(Firebird::string& ddl, const char* text);
+	void addItem(Firebird::string& ddl, const char* text, char quote = '"');
 
 public:
 	Firebird::MetaName name;
+	Firebird::string fromUtf8;
 	Firebird::MetaName* plugin;
 	Firebird::MetaName* db;
 	Firebird::MetaName* fromType;
@@ -2143,13 +2145,15 @@ private:
 	void modifyPrivileges(thread_db* tdbb, jrd_tra* transaction, SSHORT option, const GranteeClause* user);
 	void grantRevoke(thread_db* tdbb, jrd_tra* transaction, const GranteeClause* object,
 		const GranteeClause* userNod, const char* privs, const Firebird::MetaName& field, int options);
-	static void checkGrantorCanGrant(thread_db* tdbb, jrd_tra* transaction, const char* grantor,
+	static void checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* transaction, const char* grantor,
 		const char* privilege, const Firebird::MetaName& relationName,
 		const Firebird::MetaName& fieldName, bool topLevel);
 	static void checkGrantorCanGrantRole(thread_db* tdbb, jrd_tra* transaction,
 			const Firebird::MetaName& grantor, const Firebird::MetaName& roleName);
 	static void checkGrantorCanGrantDdl(thread_db* tdbb, jrd_tra* transaction,
 			const Firebird::MetaName& grantor, const char* privilege, const Firebird::MetaName& objName);
+	static void checkGrantorCanGrantObject(thread_db* tdbb, jrd_tra* transaction, const char* grantor,
+		const char* privilege, const Firebird::MetaName& objName, SSHORT objType);
 	static void storePrivilege(thread_db* tdbb, jrd_tra* transaction,
 		const Firebird::MetaName& object, const Firebird::MetaName& user,
 		const Firebird::MetaName& field, const TEXT* privilege, SSHORT userType,
@@ -2254,6 +2258,7 @@ protected:
 private:
 	static void changeBackupMode(thread_db* tdbb, jrd_tra* transaction, unsigned clause);
 	static void defineDifference(thread_db* tdbb, jrd_tra* transaction, const Firebird::PathName& file);
+	void checkClauses(thread_db* tdbb);
 
 public:
 	bool create;	// Is the node created with a CREATE DATABASE command?

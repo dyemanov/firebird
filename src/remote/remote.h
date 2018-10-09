@@ -41,6 +41,7 @@
 #include "../common/StatusHolder.h"
 #include "../common/classes/RefCounted.h"
 #include "../common/classes/GetPlugins.h"
+#include "../common/classes/RefMutex.h"
 
 #include "firebird/Interface.h"
 
@@ -120,7 +121,7 @@ namespace os_utils
 
 struct rem_port;
 
-typedef Firebird::AutoPtr<UCHAR, Firebird::ArrayDelete<UCHAR> > UCharArrayAutoPtr;
+typedef Firebird::AutoPtr<UCHAR, Firebird::ArrayDelete> UCharArrayAutoPtr;
 
 typedef Firebird::RefPtr<Firebird::IAttachment> ServAttachment;
 typedef Firebird::RefPtr<Firebird::IBlob> ServBlob;
@@ -703,6 +704,28 @@ typedef Firebird::GetPlugins<Firebird::IClient> AuthClientPlugins;
 
 // Representation of authentication data, visible for plugin
 // Transfered in format, depending upon type of the packet (phase of handshake)
+class RmtAuthBlock FB_FINAL :
+	public Firebird::VersionedIface<Firebird::IAuthBlockImpl<RmtAuthBlock, Firebird::CheckStatusWrapper> >
+{
+public:
+	RmtAuthBlock(const Firebird::AuthReader::AuthBlock& aBlock);
+
+// Firebird::IAuthBlock implementation
+	const char* getType();
+	const char* getName();
+	const char* getPlugin();
+	const char* getSecurityDb();
+	const char* getOriginalPlugin();
+	FB_BOOLEAN next(Firebird::CheckStatusWrapper* status);
+	FB_BOOLEAN first(Firebird::CheckStatusWrapper* status);
+
+private:
+	Firebird::AuthReader rdr;
+	Firebird::AuthReader::Info info;
+
+	FB_BOOLEAN loadInfo();
+};
+
 class ClntAuthBlock FB_FINAL :
 	public Firebird::RefCntIface<Firebird::IClientBlockImpl<ClntAuthBlock, Firebird::CheckStatusWrapper> >
 {
@@ -714,9 +737,11 @@ private:
 	// These two are legacy encrypted password, trusted auth data and so on - what plugin needs
 	Firebird::UCharBuffer dataForPlugin, dataFromPlugin;
 	Firebird::HalfStaticArray<InternalCryptKey*, 1> cryptKeys;		// Wire crypt keys that came from plugin(s) last time
-	Firebird::string dpbConfig;				// Used to recreate config with new filename
+	Firebird::string dpbConfig;					// User's configuretion parameters
+	Firebird::PathName dpbPlugins;				// User's plugin list
 	Firebird::RefPtr<const Config> clntConfig;	// Used to get plugins list and pass to port
-	unsigned nextKey;						// First key to be analyzed
+	Firebird::AutoPtr<RmtAuthBlock> remAuthBlock;	//Authentication block if present
+	unsigned nextKey;							// First key to be analyzed
 
 	bool hasCryptKey;						// DPB contains disk crypt key, may be passed only over encrypted wire
 
@@ -754,6 +779,7 @@ public:
 	const unsigned char* getData(unsigned int* length);
 	void putData(Firebird::CheckStatusWrapper* status, unsigned int length, const void* data);
 	Firebird::ICryptKey* newKey(Firebird::CheckStatusWrapper* status);
+	Firebird::IAuthBlock* getAuthBlock(Firebird::CheckStatusWrapper* status);
 };
 
 // Representation of authentication data, visible for plugin
@@ -873,6 +899,9 @@ const USHORT PORT_connecting	= 0x0400;	// Aux connection waits for a channel to 
 const USHORT PORT_z_data		= 0x0800;	// Zlib incoming buffer has data left after decompression
 const USHORT PORT_compressed	= 0x1000;	// Compress outgoing stream (does not affect incoming)
 
+// forward decl
+class RemotePortGuard;
+
 // Port itself
 
 typedef rem_port* (*t_port_connect)(rem_port*, PACKET*);
@@ -889,6 +918,7 @@ struct rem_port : public Firebird::GlobalStorage, public Firebird::RefCounted
 	Firebird::RefPtr<Firebird::RefMutex> port_sync;
 	Firebird::RefPtr<Firebird::RefMutex> port_que_sync;
 	Firebird::RefPtr<Firebird::RefMutex> port_write_sync;
+	Firebird::RefPtr<Firebird::RefMutex> port_cancel_sync;
 
 	// port function pointers (C "emulation" of virtual functions)
 	bool			(*port_accept)(rem_port*, const p_cnct*);
@@ -931,7 +961,8 @@ struct rem_port : public Firebird::GlobalStorage, public Firebird::RefCounted
 	struct linger	port_linger;		// linger value as defined by SO_LINGER
 	Rdb*			port_context;
 	Thread::Handle	port_events_thread;	// handle of thread, handling incoming events
-	void			(*port_events_shutdown)(rem_port*);	// hack - avoid changing API at beta stage
+	ThreadId		port_events_threadId;
+	RemotePortGuard* port_thread_guard;	// will close port_events_thread in safe way
 #ifdef WIN_NT
 	HANDLE			port_pipe;			// port pipe handle
 	HANDLE			port_event;			// event associated with a port
@@ -991,6 +1022,7 @@ public:
 		port_sync(FB_NEW_POOL(getPool()) Firebird::RefMutex()),
 		port_que_sync(FB_NEW_POOL(getPool()) Firebird::RefMutex()),
 		port_write_sync(FB_NEW_POOL(getPool()) Firebird::RefMutex()),
+		port_cancel_sync(FB_NEW_POOL(getPool()) Firebird::RefMutex()),
 		port_accept(0), port_disconnect(0), port_force_close(0), port_receive_packet(0), port_send_packet(0),
 		port_send_partial(0), port_connect(0), port_request(0), port_select_multi(0),
 		port_type(t), port_state(PENDING), port_clients(0), port_next(0),
@@ -998,7 +1030,7 @@ public:
 		port_server(0), port_server_flags(0), port_protocol(0), port_buff_size(rpt / 2),
 		port_flags(0), port_connect_timeout(0), port_dummy_packet_interval(0),
 		port_dummy_timeout(0), port_handle(INVALID_SOCKET), port_channel(INVALID_SOCKET), port_context(0),
-		port_events_thread(0), port_events_shutdown(0),
+		port_events_thread(0), port_events_threadId(0), port_thread_guard(0),
 #ifdef WIN_NT
 		port_pipe(INVALID_HANDLE_VALUE), port_event(INVALID_HANDLE_VALUE),
 #endif
@@ -1219,6 +1251,59 @@ public:
 
 private:
 	bool tryKeyType(const KnownServerKey& srvKey, InternalCryptKey* cryptKey);
+};
+
+
+// Port guard is needed to close events delivery thread in safe way
+class RemotePortGuard
+{
+private:
+	class WaitThread
+	{
+	public:
+		WaitThread(rem_port* async)
+			: asyncPort(async),
+			  waitFlag(false)
+		{ }
+
+		~WaitThread()
+		{
+			if (waitFlag)
+			{
+				Thread::waitForCompletion(waitHandle);
+				fb_assert(asyncPort);
+				if (asyncPort)
+					asyncPort->release();
+			}
+			else if (asyncPort)
+				asyncPort->port_thread_guard = NULL;
+		}
+
+		rem_port* asyncPort;
+		Thread::Handle waitHandle;
+		bool waitFlag;
+	};
+
+public:
+	RemotePortGuard(rem_port* port, const char* f)
+		: wThr(port->port_async),
+		  guard(*port->port_sync, f)
+	{
+		if (wThr.asyncPort)
+			wThr.asyncPort->port_thread_guard = this;
+	}
+
+	void setWait(Thread::Handle& handle)
+	{
+		wThr.waitHandle = handle;
+		wThr.waitFlag = true;
+		fb_assert(wThr.asyncPort);
+		wThr.asyncPort->port_thread_guard = NULL;
+	}
+
+private:
+	WaitThread wThr;
+	Firebird::RefMutexGuard guard;
 };
 
 

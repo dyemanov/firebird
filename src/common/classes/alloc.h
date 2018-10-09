@@ -67,7 +67,7 @@
 namespace Firebird {
 
 // Alignment for all memory blocks
-const size_t ALLOC_ALIGNMENT = 8;
+#define ALLOC_ALIGNMENT 16
 
 static inline size_t MEM_ALIGN(size_t value)
 {
@@ -211,12 +211,6 @@ public:
 	// Set statistics group for pool. Usage counters will be decremented from
 	// previously set group and added to new
 	void setStatsGroup(MemoryStats& stats) throw ();
-
-	// Just a helper for AutoPtr.
-	static void clear(MemoryPool* pool)
-	{
-		deletePool(pool);
-	}
 
 	// Initialize and finalize global memory pool
 	static void init();
@@ -441,7 +435,14 @@ namespace Firebird
 		explicit AutoStorage(MemoryPool& p) : PermanentStorage(p) { }
 	};
 
-	typedef AutoPtr<MemoryPool, MemoryPool> AutoMemoryPool;
+	template <>
+	inline void SimpleDelete<MemoryPool>::clear(MemoryPool* pool)
+	{
+		if (pool)
+			MemoryPool::deletePool(pool);
+	}
+
+	typedef AutoPtr<MemoryPool> AutoMemoryPool;
 
 } // namespace Firebird
 

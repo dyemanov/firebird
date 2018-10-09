@@ -336,6 +336,7 @@ namespace
 				}
 
 				PathName correctedAlias(par->name.ToPathName());
+				replace_dir_sep(correctedAlias);
 				AliasName* alias = aliasHash.lookup(correctedAlias);
 				if (alias)
 				{

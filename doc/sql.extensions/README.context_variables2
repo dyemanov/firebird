@@ -56,6 +56,14 @@ Usage:
    NETWORK_PROTOCOL | The network protocol used by client to connect. Currently
                     | used values: "TCPv4", "TCPv6", "WNET", "XNET" and NULL
                     |
+   WIRE_COMPRESSED  | Compression status of current connection. 
+                    | If connection is compressed - returns "TRUE", if it is 
+                    | not compressed - returns "FALSE". 
+                    | If connection is embedded - returns NULL.
+                    |
+   WIRE_ENCRYPTED   | Encryption status of current connection. 
+                    | Value is the same as for compression status above.
+                    |
    CLIENT_ADDRESS   | The wire protocol address and port number of remote client
                     | represented as string. Value is IP address concatenated with
                     | port number using the '/' separator character. Value is

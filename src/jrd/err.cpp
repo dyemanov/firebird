@@ -55,6 +55,7 @@ using namespace Firebird;
 
 
 static void internal_error(ISC_STATUS status, int number, const TEXT* file = NULL, int line = 0);
+static void post_nothrow(const unsigned lenToAdd, const ISC_STATUS* toAdd, FbStatusVector* statusVector);
 
 
 void ERR_bugcheck(int number, const TEXT* file, int line)
@@ -207,14 +208,45 @@ void ERR_post_nothrow(const Arg::StatusVector& v, FbStatusVector* statusVector)
  *
  **************************************/
 {
-	// calculate length of the status
-	unsigned lenToAdd = v.length();
+	post_nothrow(v.length(), v.value(), statusVector);
+}
+
+
+void ERR_post_nothrow(const IStatus* v, FbStatusVector* statusVector)
+/**************************************
+ *
+ *	E R R _ p o s t _ n o t h r o w
+ *
+ **************************************
+ *
+ * Functional description
+ *	Populate a status vector.
+ *
+ **************************************/
+{
+	const ISC_STATUS* toAdd = v->getErrors();
+	post_nothrow(fb_utils::statusLength(toAdd), toAdd, statusVector);
+}
+
+
+static void post_nothrow(const unsigned lenToAdd, const ISC_STATUS* toAdd, FbStatusVector* statusVector)
+/**************************************
+ *
+ *	E R R _ p o s t _ n o t h r o w
+ *
+ **************************************
+ *
+ * Functional description
+ *	Populate a status vector.
+ *
+ **************************************/
+{
+	// check status to add
 	if (lenToAdd == 0)	// nothing to do
 		return;
-	const ISC_STATUS* toAdd = v.value();
     fb_assert(toAdd[0] == isc_arg_gds);
 
-	// Use default from tdbb when no vector specified
+	// use default from tdbb when no vector specified
 	if (!statusVector)
 		statusVector = JRD_get_thread_data()->tdbb_status_vector;
 

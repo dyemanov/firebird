@@ -181,9 +181,9 @@ const Config::ConfigEntry Config::entries[MAX_CONFIG_KEY] =
 	{TYPE_STRING,		"Providers",				(ConfigValue) "Remote, " CURRENT_ENGINE ", Loopback"},
 	{TYPE_STRING,		"AuthServer",				(ConfigValue) "Srp"},
 #ifdef WIN_NT
-	{TYPE_STRING,		"AuthClient",				(ConfigValue) "Srp, Win_Sspi, Legacy_Auth"},
+	{TYPE_STRING,		"AuthClient",				(ConfigValue) "Srp, Srp256, Win_Sspi, Legacy_Auth"},
 #else
-	{TYPE_STRING,		"AuthClient",				(ConfigValue) "Srp, Legacy_Auth"},
+	{TYPE_STRING,		"AuthClient",				(ConfigValue) "Srp, Srp256, Legacy_Auth"},
 #endif
 	{TYPE_STRING,		"UserManager",				(ConfigValue) "Srp"},
 	{TYPE_STRING,		"TracePlugin",				(ConfigValue) "fbtrace"},

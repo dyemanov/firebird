@@ -166,7 +166,7 @@ private:
 	private:
 		Firebird::IExternalEngine* engine;
 		Attachment* internalAttachment;
-		jrd_tra* internalTransaction;
+		Firebird::ITransaction* internalTransaction;
 		Firebird::IAttachment* externalAttachment;
 		Firebird::ITransaction* externalTransaction;
 		Firebird::GenericMap<Firebird::NonPooled<int, void*> > miscInfo;

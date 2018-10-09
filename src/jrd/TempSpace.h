@@ -212,7 +212,7 @@ private:
 	typedef Firebird::BePlusTree<Segment, offset_t, MemoryPool, Segment> FreeSegmentTree;
 	FreeSegmentTree freeSegments;
 
-	static Firebird::GlobalPtr<Firebird::Mutex> initMutex;
+	static Firebird::GlobalPtr<Firebird::Mutex> globalMutex;
 	static Firebird::TempDirectoryList* tempDirs;
 	static FB_SIZE_T minBlockSize;
 	static offset_t globalCacheUsage;

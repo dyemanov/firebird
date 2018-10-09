@@ -154,14 +154,15 @@ public:
 	}
 
 private:
+	static const IPTR nullmem = 0;
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnew-returns-null"
 #endif
 
 	// These operators are off-limits
-	void* operator new(size_t) { return 0; }
-	void* operator new[](size_t) { return 0; }
+	void* operator new(size_t) { return (void*)nullmem; }
+	void* operator new[](size_t) { return (void*)nullmem; }
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -193,6 +194,7 @@ public:
 	}
 
 private:
+	static const IPTR nullmem = 0;
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wnew-returns-null"
@@ -201,7 +203,7 @@ private:
 	// These operations are not supported on static repeat-base objects
 	void* operator new[](size_t /*s*/, MemoryPool& /*p*/)
 	{
-		return 0;
+		return (void*)nullmem;
 	}
 
 	void operator delete[](void* /*mem*/, MemoryPool& /*p*/)
@@ -213,8 +215,8 @@ private:
 	}
 
 	// These operators are off-limits
-	void* operator new(size_t) { return 0; }
-	void* operator new[](size_t) { return 0; }
+	void* operator new(size_t) { return (void*)nullmem; }
+	void* operator new[](size_t) { return (void*)nullmem; }
 
 #ifdef __clang__
 #pragma clang diagnostic pop

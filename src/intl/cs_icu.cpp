@@ -28,7 +28,6 @@
 #include "../intl/ldcommon.h"
 #include "cs_icu.h"
 #include "cv_icu.h"
-#include <unicode/ucnv.h>
 #include "../common/unicode_util.h"
 
 

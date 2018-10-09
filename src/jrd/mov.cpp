@@ -446,7 +446,76 @@ void MOV_move(Jrd::thread_db* tdbb, /*const*/ dsc* from, dsc* to)
  **************************************/
 
 	if (DTYPE_IS_BLOB_OR_QUAD(from->dsc_dtype) || DTYPE_IS_BLOB_OR_QUAD(to->dsc_dtype))
-		Jrd::blb::move(tdbb, from, to, NULL);
+		Jrd::blb::move(tdbb, from, to);
 	else
 		CVT_move(from, to);
 }
+
+namespace Jrd
+{
+
+DescPrinter::DescPrinter(thread_db* tdbb, const dsc* desc, int mLen) :
+  maxLen(mLen)
+{
+	const char* const NULL_KEY_STRING = "NULL";
+
+	if (!desc)
+	{
+		value = NULL_KEY_STRING;
+		return;
+	}
+
+	fb_assert(!desc->isBlob());
+
+	const bool octets = (desc->isText() && desc->getTextType() == ttype_binary);
+	value = MOV_make_string2(tdbb, desc, octets ? ttype_binary : ttype_dynamic);
+
+	const char* const str = value.c_str();
+
+	if (desc->isText() || desc->isDateTime())
+	{
+		if (desc->dsc_dtype == dtype_text)
+		{
+			const char* const pad = (desc->dsc_sub_type == ttype_binary) ? "\0" : " ";
+			value.rtrim(pad);
+		}
+
+		if (octets)
+		{
+			Firebird::string hex;
+
+			int len = (int) value.length();
+			const bool cut = (len > (maxLen - 3) / 2);
+			if (cut)
+				len = (maxLen - 5) / 2;
+
+			char* s = hex.getBuffer(2 * len);
+			for (int i = 0; i < len; i++)
+			{
+				sprintf(s, "%02X", (int)(unsigned char)str[i]);
+				s += 2;
+			}
+			value = "x'" + hex + (cut ? "..." : "'");
+		}
+		else
+		{
+			value = "'" + value + "'";
+		}
+	}
+
+	if (value.length() > (FB_SIZE_T) maxLen)
+	{
+		fb_assert(desc->isText());
+
+		value.resize(maxLen);
+
+		const CharSet* const cs = INTL_charset_lookup(tdbb, desc->getCharSet());
+
+		while (value.hasData() && !cs->wellFormed(value.length(), (const UCHAR*)value.c_str()))
+			value.resize(value.length() - 1);
+
+		value += "...";
+	}
+}
+
+}; // namespace Jrd

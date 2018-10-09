@@ -55,7 +55,7 @@ class jrd_tra;
 class vcl;
 class thread_db;
 struct win;
-class ValueExprNode;
+struct record_param;
 class ArrayField;
 struct impure_value;
 
@@ -107,7 +107,7 @@ public:
 	static SLONG get_slice(Jrd::thread_db*, Jrd::jrd_tra*, const Jrd::bid*, const UCHAR*, USHORT,
 					const UCHAR*, SLONG, UCHAR*);
 	SLONG	BLB_lseek(USHORT, SLONG);
-	static void	move(thread_db* tdbb, dsc* from_desc, dsc* to_desc, const ValueExprNode* field);
+	static void	move(thread_db* tdbb, dsc* from_desc, dsc* to_desc, const record_param* rpb = NULL, USHORT fieldId = 0);
 	static blb* open(thread_db*, jrd_tra*, const bid*);
 	static blb* open2(thread_db*, jrd_tra*, const bid*, USHORT, const UCHAR*, bool = false);
 	void	BLB_put_data(thread_db*, const UCHAR*, SLONG);

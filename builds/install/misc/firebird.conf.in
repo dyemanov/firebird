@@ -51,8 +51,12 @@
 # Per-database configuration is done in file databases.conf (former aliases.conf).
 # Per-connection configuration is primarily client tool and done using
 # isc_dpb_config parameter in DPB (isc_spb_config for services).
-# Notice that per-database entries also may be tuned using DPB in case of
-# embedded engine when attaching to database first time.
+# Configuration data, added to parameters block, has same format as this file.
+# Pay attention that since firebird3 there is no hard limit of 255 bytes per entry
+# provided you are using isc_dpb_version2 format of DPB. The simplest way to create
+# DPB/SPB is to use IXpbBuilder - when needed you will have >255 bytes entries in
+# parameters block. Notice that per-database entries also may be tuned using DPB
+# in case of embedded engine when attaching to database first time.
 #
 # Macro substitution
 # ------------------
@@ -390,13 +394,22 @@
 #
 # Type: string
 
-# AuthServer and AuthClient determine what authentication methods will be used
-# by network server and client redirector. Secure remote passwords plugin
-# is default one. Except configured by default SRP plugin firebird also has
-# Legacy_Auth plugin which is used to emulate pre-FB3 login protocol making it
-# possible for client to talk to old servers and for server to listen to requests
-# from old clients. Legacy_Auth is VERY unsecure. On windows Win_Sspi plugin may
-# be also used - it implements windows trusted authentication and backward
+# AuthServer and AuthClient determine which authentication methods will be used
+# by network server and client redirector. The Secure remote password plugin
+# using SHA-1 for the client proof is the default for both client and server.
+# Additionally, the default client configuration (AuthClient) also supports new Srp256
+# plugin using SHA-2 for the client proof. This enables backwards compatibility
+# with older Firebird 3 servers & clients but in order to meet NIST requirements
+# Srp256 should be used. To enforce NIST requirements on your server set
+# AuthServer=Srp256. Be aware that this breaks compatibility with older
+# than 3.0.4 clients.
+#
+# The default client configuration (AuthClient) also supports the pre-Firebird 3 legacy 
+# authentication protocol (Legacy_Auth). This is again for backwards 
+# compatibility but has many known weaknesses and is deprecated for current use.
+#
+# The default Windows client configuration (AuthClient) also includes support for
+# the Win_Sspi plugin. This implements windows trusted authentication and is backward
 # compatible with 2.1 and 2.5 clients and servers running on windows.
 #
 # Per-database configurable.
@@ -405,7 +418,8 @@
 #
 # Per-connection and per-database configurable.
 #
-#AuthClient = Srp, Win_Sspi, Legacy_Auth
+#AuthClient = Srp, Srp256, Legacy_Auth           #Non Windows clients
+#AuthClient = Srp, Srp256, Win_Sspi, Legacy_Auth #Windows clients
 #
 # If you need to use server plugins that do not provide encryption key (both Legacy_Auth
 # & Win_Sspi) you should also turn off required encryption on the wire with WireCrypt

@@ -838,9 +838,6 @@ namespace Jrd
 	{
 		class HashTable;
 
-		typedef Firebird::Array<USHORT> KeyLengthArray;
-		typedef Firebird::Array<UCHAR> KeyBuffer;
-
 		struct SubStream
 		{
 			union
@@ -850,16 +847,15 @@ namespace Jrd
 			};
 
 			NestValueArray* keys;
-			KeyLengthArray* keyLengths;
+			ULONG* keyLengths;
 			ULONG totalKeyLength;
 		};
 
 		struct Impure : public RecordSource::Impure
 		{
-			KeyBuffer* irsb_arg_buffer;
 			HashTable* irsb_hash_table;
 			UCHAR* irsb_leader_buffer;
-			ULONG* irsb_record_counts;
+			ULONG irsb_leader_hash;
 		};
 
 	public:
@@ -883,8 +879,8 @@ namespace Jrd
 		void nullRecords(thread_db* tdbb) const;
 
 	private:
-		void computeKeys(thread_db* tdbb, jrd_req* request,
-						 const SubStream& sub, UCHAR* buffer) const;
+		ULONG computeHash(thread_db* tdbb, jrd_req* request,
+						  const SubStream& sub, UCHAR* buffer) const;
 		bool fetchRecord(thread_db* tdbb, Impure* impure, FB_SIZE_T stream) const;
 
 		SubStream m_leader;

@@ -602,8 +602,8 @@ ExtEngineManager::ExternalContextImpl::ExternalContextImpl(thread_db* tdbb,
 
 	internalAttachment->getStable()->addRef();
 
-	externalAttachment = MasterInterfacePtr()->registerAttachment(JProvider::getInstance(),
-		internalAttachment->getInterface());
+	externalAttachment = MasterInterfacePtr()->registerAttachment
+		(AutoPlugin<JProvider>(JProvider::getInstance()), internalAttachment->getInterface());
 }
 
 ExtEngineManager::ExternalContextImpl::~ExternalContextImpl()
@@ -630,21 +630,16 @@ void ExtEngineManager::ExternalContextImpl::releaseTransaction()
 
 void ExtEngineManager::ExternalContextImpl::setTransaction(thread_db* tdbb)
 {
-	jrd_tra* newTransaction = tdbb->getTransaction();
+	ITransaction* newTransaction = tdbb->getTransaction() ? tdbb->getTransaction()->getInterface(true) : NULL;
 
 	if (newTransaction == internalTransaction)
 		return;
 
 	releaseTransaction();
-	fb_assert(!externalTransaction);
+	fb_assert(!externalTransaction && !internalTransaction);
 
 	if ((internalTransaction = newTransaction))
-	{
-		internalTransaction->getInterface(true)->addRef();
-
-		externalTransaction = MasterInterfacePtr()->registerTransaction(externalAttachment,
-			internalTransaction->getInterface(true));
-	}
+		externalTransaction = MasterInterfacePtr()->registerTransaction(externalAttachment, internalTransaction);
 }
 
 IMaster* ExtEngineManager::ExternalContextImpl::getMaster()

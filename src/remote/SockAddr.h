@@ -92,20 +92,31 @@ public:
 #define AF_INET6_WINDOWS	23
 #define AF_INET6_DARWIN		30
 
-inline void SockAddr::checkAndFixFamily()
-{
 #if AF_INET6 == AF_INET6_POSIX
-	if (data.sock.sa_family == AF_INET6_WINDOWS)
 #elif AF_INET6 == AF_INET6_WINDOWS
-	if (data.sock.sa_family == AF_INET6_POSIX)
 #elif AF_INET6 == AF_INET6_DARWIN
-	if (data.sock.sa_family == AF_INET6_DARWIN)
 #else
 #error Unknown value of AF_INET6 !
 #endif
+
+inline void SockAddr::checkAndFixFamily()
+{
+	switch (data.sock.sa_family)
 	{
+	case AF_INET:
+		fb_assert(len == sizeof(sockaddr_in));
+		break;
+
+	case AF_INET6_POSIX:
+	case AF_INET6_WINDOWS:
+	case AF_INET6_DARWIN:
 		data.sock.sa_family = AF_INET6;
 		fb_assert(len == sizeof(sockaddr_in6));
+		break;
+
+	default:
+		fb_assert(false);
+		break;
 	}
 }
 

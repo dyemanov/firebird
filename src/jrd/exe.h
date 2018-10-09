@@ -477,6 +477,14 @@ public:
 		return csb_n_stream++;
 	}
 
+	void inheritViewFlags(StreamType stream, USHORT flags)
+	{
+		if (csb_view)
+		{
+			csb_rpt[stream].csb_flags |= csb_rpt[csb_view_stream].csb_flags & flags;
+		}
+	}
+
 #ifdef CMP_DEBUG
 	void dump(const char* format, ...)
 	{
@@ -615,6 +623,7 @@ const int csb_sub_stream	= 128;		// a sub-stream of the RSE being processed
 const int csb_erase			= 256;		// we are processing an erase
 const int csb_unmatched		= 512;		// stream has conjuncts unmatched by any index
 const int csb_update		= 1024;		// erase or modify for relation
+const int csb_unstable		= 2048;		// unstable explicit cursor
 
 inline void CompilerScratch::csb_repeat::activate()
 {

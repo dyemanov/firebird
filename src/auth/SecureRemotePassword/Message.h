@@ -98,7 +98,7 @@ public:
 
 	~Message()
 	{
-		delete buffer;
+		delete[] buffer;
 #ifndef INTERNAL_FIREBIRD
 		s->dispose();
 #endif
@@ -301,7 +301,7 @@ public:
 
 	~Field()
 	{
-		delete charBuffer;
+		delete[] charBuffer;
 	}
 
 	operator T()

@@ -2709,7 +2709,7 @@ static void pass1_union_auto_cast(DsqlCompilerScratch* dsqlScratch, ExprNode* in
 
 						// When a cast is created we're losing our fieldname, thus
 						// create an alias to keep it.
-						const ValueExprNode* name_node = select_item;
+						ValueExprNode* name_node = select_item;
 						const DsqlMapNode* mapNode;
 
 						while ((mapNode = ExprNode::as<DsqlMapNode>(name_node)))
@@ -2725,6 +2725,13 @@ static void pass1_union_auto_cast(DsqlCompilerScratch* dsqlScratch, ExprNode* in
 							// Create new node for alias and copy fieldname.
 							newAliasNode = FB_NEW_POOL(*tdbb->getDefaultPool()) DsqlAliasNode(
 								*tdbb->getDefaultPool(), fieldNode->dsqlField->fld_name, NULL);
+							// The alias value will be assigned a bit later.
+						}
+						else if ((derivedField = ExprNode::as<DerivedFieldNode>(name_node)))
+						{
+							// Create new node for alias and copy fieldname.
+							newAliasNode = FB_NEW_POOL(*tdbb->getDefaultPool()) DsqlAliasNode(
+								*tdbb->getDefaultPool(), derivedField->name, NULL);
 							// The alias value will be assigned a bit later.
 						}
 					}

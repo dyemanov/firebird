@@ -136,6 +136,61 @@ namespace {
 	GlobalPtr<AllServices> allServices;	// protected by globalServicesMutex
 	volatile bool svcShutdown = false;
 
+	class ThreadCollect
+	{
+	public:
+		ThreadCollect(MemoryPool& p)
+			: threads(p)
+		{ }
+
+		void join()
+		{
+			// join threads to be sure they are gone when shutdown is complete
+			// no need locking something cause this is expected to run when services are closing
+			waitFor(threads);
+		}
+
+		void add(Thread::Handle& h)
+		{
+			// put thread into completion wait queue when it finished running
+			MutexLockGuard g(threadsMutex, FB_FUNCTION);
+			threads.add(h);
+		}
+
+		void houseKeeping()
+		{
+			if (!threads.hasData())
+				return;
+
+			// join finished threads
+			AllThreads t;
+			{ // mutex scope
+				MutexLockGuard g(threadsMutex, FB_FUNCTION);
+				t.assign(threads);
+				threads.clear();
+			}
+
+			waitFor(t);
+		}
+
+	private:
+		typedef Array<Thread::Handle> AllThreads;
+
+		static void waitFor(AllThreads& thr)
+		{
+			while (thr.hasData())
+			{
+				Thread::Handle h(thr.pop());
+				Thread::waitForCompletion(h);
+			}
+		}
+
+		AllThreads threads;
+		Mutex threadsMutex;
+	};
+
+	GlobalPtr<ThreadCollect> threadCollect;
+
 	void spbVersionError()
 	{
 		ERR_post(Arg::Gds(isc_bad_spb_form) <<
@@ -655,7 +710,7 @@ Service::Service(const TEXT* service_name, USHORT spb_length, const UCHAR* spb_d
 	svc_remote_pid(0), svc_trace_manager(NULL), svc_crypt_callback(crypt_callback),
 	svc_existence(FB_NEW_POOL(*getDefaultMemoryPool()) SvcMutex(this)),
 	svc_stdin_size_requested(0), svc_stdin_buffer(NULL), svc_stdin_size_preload(0),
-	svc_stdin_preload_requested(0), svc_stdin_user_size(0)
+	svc_stdin_preload_requested(0), svc_stdin_user_size(0), svc_thread(0)
 #ifdef DEV_BUILD
 	, svc_debug(false)
 #endif
@@ -988,6 +1043,8 @@ void Service::shutdownServices()
 
 		++pos;
 	}
+
+	threadCollect->join();
 }
 
 
@@ -1128,7 +1185,7 @@ ISC_STATUS Service::query2(thread_db* /*tdbb*/,
 				{
 					if (!(info = INF_put_item(isc_spb_dbname,
 											  (USHORT) databases[i].length(),
-											  (const UCHAR*) databases[i].c_str(),
+											  databases[i].c_str(),
 											  info, end)))
 					{
 						return 0;
@@ -1268,8 +1325,7 @@ ISC_STATUS Service::query2(thread_db* /*tdbb*/,
 		case isc_info_svc_server_version:
 			// The version of the server engine
 			{ // scope
-				static const UCHAR* pv = reinterpret_cast<const UCHAR*>(FB_VERSION);
-				info = INF_put_item(item, static_cast<USHORT>(strlen(FB_VERSION)), pv, info, end);
+				info = INF_put_item(item, static_cast<USHORT>(strlen(FB_VERSION)), FB_VERSION, info, end);
 				if (!info) {
 					return 0;
 				}
@@ -1280,8 +1336,7 @@ ISC_STATUS Service::query2(thread_db* /*tdbb*/,
 			// The server implementation - e.g. Firebird/sun4
 			{ // scope
 				string buf2 = DbImplementation::current.implementation();
-				info = INF_put_item(item, buf2.length(),
-									reinterpret_cast<const UCHAR*>(buf2.c_str()), info, end);
+				info = INF_put_item(item, buf2.length(), buf2.c_str(), info, end);
 				if (!info) {
 					return 0;
 				}
@@ -1307,11 +1362,10 @@ ISC_STATUS Service::query2(thread_db* /*tdbb*/,
 			if (svc_user_flag & SVC_user_dba)
 			{
 				// The path to the user security database (security2.fdb)
-				char* pb = reinterpret_cast<char*>(buffer);
 				const RefPtr<const Config> defConf(Config::getDefaultConfig());
-				strcpy(pb, defConf->getSecurityDatabase());
+				const char* secDb = defConf->getSecurityDatabase();
 
-				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(pb)), buffer, info, end)))
+				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(secDb)), secDb, info, end)))
 				{
 					return 0;
 				}
@@ -1660,8 +1714,7 @@ void Service::query(USHORT			send_item_length,
 				// Note: it is safe to use strlen to get a length of "buffer"
 				// because gds_prefix[_lock|_msg] return a zero-terminated
 				// string.
-				const UCHAR* pb = reinterpret_cast<const UCHAR*>(PathBuffer);
-				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(PathBuffer)), pb, info, end)))
+				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(PathBuffer)), PathBuffer, info, end)))
 					return;
 			}
 			// Can not return error for service v.1 => simply ignore request
@@ -1761,11 +1814,10 @@ void Service::query(USHORT			send_item_length,
             if (svc_user_flag & SVC_user_dba)
             {
 				// The path to the user security database (security2.fdb)
-				char* pb = reinterpret_cast<char*>(buffer);
 				const RefPtr<const Config> defConf(Config::getDefaultConfig());
-				strcpy(pb, defConf->getSecurityDatabase());
+				const char* secDb = defConf->getSecurityDatabase();
 
-				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(pb)), buffer, info, end)))
+				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(secDb)), secDb, info, end)))
 				{
 					return;
 				}
@@ -1917,6 +1969,11 @@ THREAD_ENTRY_DECLARE Service::run(THREAD_ENTRY_PARAM arg)
 		RefPtr<SvcMutex> ref(svc->svc_existence);
 		exit_code = svc->svc_service_run->serv_thd(svc);
 
+		if (svc->svc_thread)
+		{
+			threadCollect->add(svc->svc_thread);
+			svc->svc_thread = 0;
+		}
 		svc->started();
 		svc->svc_sem_full.release();
 		svc->finish(SVC_finished);
@@ -2079,7 +2136,10 @@ void Service::start(USHORT spb_length, const UCHAR* spb_data)
 
 		svc_stdout_head = svc_stdout_tail = 0;
 
-		Thread::start(run, this, THREAD_medium);
+		Thread::start(run, this, THREAD_medium, &svc_thread);
+
+		// good time for housekeeping while new thread starts
+		threadCollect->houseKeeping();
 
 		// Check for the service being detached. This will prevent the thread
 		// from waiting infinitely if the client goes away.
@@ -2204,7 +2264,7 @@ void Service::start(const serv_entry* service_run)
 	}
 
 	svc_service_run = service_run;
-	Thread::start(run, this, THREAD_medium);
+	Thread::start(run, this, THREAD_medium, &svc_thread);
 }
 
 

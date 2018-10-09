@@ -2008,6 +2008,10 @@ void BTR_selectivity(thread_db* tdbb, jrd_rel* relation, USHORT id, SelectivityL
 		CCH_RELEASE(tdbb, &window);
 		return;
 	}
+
+	const bool descending = (root->irt_rpt[id].irt_flags & irt_descending);
+	const ULONG segments = root->irt_rpt[id].irt_keys;
+
 	window.win_flags = WIN_large_scan;
 	window.win_scans = 1;
 	btree_page* bucket = (btree_page*) CCH_HANDOFF(tdbb, &window, page, LCK_read, pag_index);
@@ -2030,8 +2034,6 @@ void BTR_selectivity(thread_db* tdbb, jrd_rel* relation, USHORT id, SelectivityL
 	key.key_length = 0;
 	SSHORT l;
 	bool firstNode = true;
-	const bool descending = (root->irt_rpt[id].irt_flags & irt_descending);
-	const ULONG segments = root->irt_rpt[id].irt_keys;
 
 	// SSHORT count, stuff_count, pos, i;
 	Firebird::HalfStaticArray<FB_UINT64, 4> duplicatesList;
@@ -5968,76 +5970,7 @@ string print_key(thread_db* tdbb, jrd_rel* relation, index_desc* idx, Record* re
 		MET_scan_relation(tdbb, relation);
 	}
 
-	class Printer
-	{
-	public:
-		explicit Printer(thread_db* tdbb, const dsc* desc)
-		{
-			const int MAX_KEY_STRING_LEN = 250;
-			const char* const NULL_KEY_STRING = "NULL";
-
-			if (!desc)
-			{
-				value = NULL_KEY_STRING;
-				return;
-			}
-
-			fb_assert(!desc->isBlob());
-
-			value = MOV_make_string2(tdbb, desc, ttype_dynamic);
-
-			const int len = (int) value.length();
-			const char* const str = value.c_str();
-
-			if (desc->isText() || desc->isDateTime())
-			{
-				if (desc->dsc_dtype == dtype_text)
-				{
-					const char* const pad = (desc->dsc_sub_type == ttype_binary) ? "\0": " ";
-					value.rtrim(pad);
-				}
-
-				if (desc->isText() && desc->getTextType() == ttype_binary)
-				{
-					string hex;
-					char* s = hex.getBuffer(2 * len);
-					for (int i = 0; i < len; i++)
-					{
-						sprintf(s, "%02X", (int) (unsigned char) str[i]);
-						s += 2;
-					}
-					value = "x'" + hex + "'";
-				}
-				else
-				{
-					value = "'" + value + "'";
-				}
-			}
-
-			if (value.length() > MAX_KEY_STRING_LEN)
-			{
-				fb_assert(desc->isText());
-
-				value.resize(MAX_KEY_STRING_LEN);
-
-				const CharSet* const cs = INTL_charset_lookup(tdbb, desc->getCharSet());
-
-				while (value.hasData() && !cs->wellFormed(value.length(), (const UCHAR*) value.c_str()))
-					value.resize(value.length() - 1);
-
-				value += "...";
-			}
-		}
-
-		const string& get() const
-		{
-			return value;
-		}
-
-	private:
-		string value;
-	};
-
+	const int MAX_KEY_STRING_LEN = 250;
 	string key, value;
 
 	try
@@ -6046,7 +5979,7 @@ string print_key(thread_db* tdbb, jrd_rel* relation, index_desc* idx, Record* re
 		{
 			bool notNull = false;
 			const dsc* const desc = BTR_eval_expression(tdbb, idx, record, notNull);
-			value = Printer(tdbb, notNull ? desc : NULL).get();
+			value = DescPrinter(tdbb, notNull ? desc : NULL, MAX_KEY_STRING_LEN).get();
 			key += "<expression> = " + value;
 		}
 		else
@@ -6065,7 +5998,7 @@ string print_key(thread_db* tdbb, jrd_rel* relation, index_desc* idx, Record* re
 
 				dsc desc;
 				const bool notNull = EVL_field(relation, record, field_id, &desc);
-				value = Printer(tdbb, notNull ? &desc : NULL).get();
+				value = DescPrinter(tdbb, notNull ? &desc : NULL, MAX_KEY_STRING_LEN).get();
 				key += " = " + value;
 
 				if (i < idx->idx_count - 1)

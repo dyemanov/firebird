@@ -205,8 +205,13 @@ public:
 		Info()
 			: found(0), current(0)
 		{ }
+
+		Info(MemoryPool& pool)
+			: type(pool), name(pool), plugin(pool), secDb(pool), origPlug(pool), found(0), current(0)
+		{ }
 	};
 
+	AuthReader(MemoryPool& pool, const AuthBlock& authBlock);
 	explicit AuthReader(const AuthBlock& authBlock);
 	explicit AuthReader(const ClumpletReader& rdr)
 		: ClumpletReader(rdr)

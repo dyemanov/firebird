@@ -589,11 +589,15 @@ using namespace Firebird;
 %token <metaNamePtr> REGR_SXY
 %token <metaNamePtr> REGR_SYY
 
+// tokens added for Firebird 3.0.4
+
+%token <metaNamePtr> LOCALTIME
+%token <metaNamePtr> LOCALTIMESTAMP
+
 // tokens added for Firebird 4.0
 
 %token <metaNamePtr> MESSAGE
 %token <metaNamePtr> RDB_ERROR
-
 
 // precedence declarations for expression evaluation
 
@@ -3869,6 +3873,8 @@ keyword_or_column
 	| UPDATING
 	| VAR_SAMP
 	| VAR_POP
+	| LOCALTIME				// added in FB 3.0.4
+	| LOCALTIMESTAMP
 	;
 
 col_opt
@@ -5005,10 +5011,10 @@ with_list
 			$$ = newNode<WithClause>();
 			$$->add($1);
 		}
-	| with_item ',' with_list
+	| with_list ',' with_item
 		{
-			$$ = $3;
-			$$->add($1);
+			$$ = $1;
+			$$->add($3);
 		}
 	;
 
@@ -6402,7 +6408,7 @@ map_from_symbol_name
 
 %type <intlStringPtr> map_logoninfo
 map_logoninfo
-	: STRING
+	: sql_string
 	| valid_symbol_name		{ $$ = newNode<IntlString>($1->c_str()); }
 	;
 
@@ -6581,8 +6587,34 @@ datetime_value_expression
 
 			$$ = newNode<CurrentTimeNode>($2);
 		}
+	| LOCALTIME time_precision_opt
+		{
+			if (client_dialect < SQL_DIALECT_V6_TRANSITION)
+			{
+				ERRD_post(Arg::Gds(isc_sqlerr) << Arg::Num(-104) <<
+						  Arg::Gds(isc_sql_dialect_datatype_unsupport) << Arg::Num(client_dialect) <<
+						  												  Arg::Str("TIME"));
+			}
+
+			if (db_dialect < SQL_DIALECT_V6_TRANSITION)
+			{
+				ERRD_post(Arg::Gds(isc_sqlerr) << Arg::Num(-104) <<
+						  Arg::Gds(isc_sql_db_dialect_dtype_unsupport) << Arg::Num(db_dialect) <<
+						  												  Arg::Str("TIME"));
+			}
+
+			CurrentTimeNode* node = newNode<CurrentTimeNode>($2);
+			node->dsqlLocal = true;
+			$$ = node;
+		}
 	| CURRENT_TIMESTAMP timestamp_precision_opt
 		{ $$ = newNode<CurrentTimeStampNode>($2); }
+	| LOCALTIMESTAMP timestamp_precision_opt
+		{
+			CurrentTimeStampNode* node = newNode<CurrentTimeStampNode>($2);
+			node->dsqlLocal = true;
+			$$ = node;
+		}
 	;
 
 %type <uintVal>	time_precision_opt

@@ -864,13 +864,12 @@ ISC_STATUS API_ROUTINE isc_add_user(ISC_STATUS* status, const USER_SEC_DATA* inp
  **************************************/
 	Auth::StackUserData userInfo;
 	userInfo.op = Auth::ADD_OPER;
-	Firebird::string work;
 	Firebird::LocalStatus s;
 	Firebird::CheckStatusWrapper statusWrapper(&s);
 
 	if (input_user_data->user_name)
 	{
-		work = input_user_data->user_name;
+		Firebird::string work = input_user_data->user_name;
 		if (work.length() > USERNAME_LENGTH) {
 			return user_error(status, isc_usrname_too_long);
 		}
@@ -891,18 +890,7 @@ ISC_STATUS API_ROUTINE isc_add_user(ISC_STATUS* status, const USER_SEC_DATA* inp
 
 	if (input_user_data->password)
 	{
-		/*
-		if (strlen(input_user_data->password) > 8) {
-			return user_error(status, isc_password_too_long);
-		}
-		*/
-
-		Firebird::string::size_type l = work.find(' ');
-		if (l != Firebird::string::npos) {
-			work.resize(l);
-		}
-
-		userInfo.pass.set(&statusWrapper, work.c_str());
+		userInfo.pass.set(&statusWrapper, input_user_data->password);
 		Firebird::check(&statusWrapper);
 		userInfo.pass.setEntered(&statusWrapper, 1);
 		Firebird::check(&statusWrapper);
@@ -939,13 +927,12 @@ ISC_STATUS API_ROUTINE isc_delete_user(ISC_STATUS* status, const USER_SEC_DATA* 
  **************************************/
 	Auth::StackUserData userInfo;
 	userInfo.op = Auth::DEL_OPER;
-	Firebird::string work;
 	Firebird::LocalStatus s;
 	Firebird::CheckStatusWrapper statusWrapper(&s);
 
 	if (input_user_data->user_name)
 	{
-		work = input_user_data->user_name;
+		Firebird::string work = input_user_data->user_name;
 		if (work.length() > USERNAME_LENGTH) {
 			return user_error(status, isc_usrname_too_long);
 		}
@@ -985,13 +972,12 @@ ISC_STATUS API_ROUTINE isc_modify_user(ISC_STATUS* status, const USER_SEC_DATA* 
  **************************************/
 	Auth::StackUserData userInfo;
 	userInfo.op = Auth::MOD_OPER;
-	Firebird::string work;
 	Firebird::LocalStatus s;
 	Firebird::CheckStatusWrapper statusWrapper(&s);
 
 	if (input_user_data->user_name)
 	{
-		work = input_user_data->user_name;
+		Firebird::string work = input_user_data->user_name;
 		if (work.length() > USERNAME_LENGTH) {
 			return user_error(status, isc_usrname_too_long);
 		}
@@ -1012,18 +998,7 @@ ISC_STATUS API_ROUTINE isc_modify_user(ISC_STATUS* status, const USER_SEC_DATA* 
 
 	if (input_user_data->password)
 	{
-		/*
-		if (strlen(input_user_data->password) > 8) {
-			return user_error(status, isc_password_too_long);
-		}
-		*/
-
-		Firebird::string::size_type l = work.find(' ');
-		if (l != Firebird::string::npos) {
-			work.resize(l);
-		}
-
-		userInfo.pass.set(&statusWrapper, work.c_str());
+		userInfo.pass.set(&statusWrapper, input_user_data->password);
 		check(&statusWrapper);
 		userInfo.pass.setEntered(&statusWrapper, 1);
 		check(&statusWrapper);

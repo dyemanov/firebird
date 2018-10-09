@@ -60,6 +60,7 @@
 #include "../common/IntlUtil.h"
 #include "../common/os/os_utils.h"
 #include "../burp/burpswi.h"
+#include "../common/db_alias.h"
 
 #ifdef HAVE_CTYPE_H
 #include <ctype.h>
@@ -546,7 +547,7 @@ int gbak(Firebird::UtilSvc* uSvc)
 				// Miserable thing must be a filename
 				// (dummy in a length for the backup file
 
-				file = FB_NEW_POOL(*getDefaultMemoryPool()) burp_fil(*getDefaultMemoryPool());
+				file = FB_NEW_POOL(tdgbl->getPool()) burp_fil(tdgbl->getPool());
 				file->fil_name = str.ToPathName();
 				file->fil_length = file_list ? 0 : MAX_LENGTH;
 				file->fil_next = file_list;
@@ -976,10 +977,22 @@ int gbak(Firebird::UtilSvc* uSvc)
 			file1 = file->fil_name.c_str();
 		else if (!file2)
 			file2 = file->fil_name.c_str();
+
+		Firebird::PathName expanded;
+		expandDatabaseName(file->fil_name, expanded, NULL);
+
 		for (file_list = file->fil_next; file_list;
 			 file_list = file_list->fil_next)
 		{
-			if (file->fil_name == file_list->fil_name)
+			if (file->fil_name == file_list->fil_name || expanded == file_list->fil_name)
+			{
+				BURP_error(9, true);
+				// msg 9 mutiple sources or destinations specified
+			}
+
+			Firebird::PathName expanded2;
+			expandDatabaseName(file_list->fil_name, expanded2, NULL);
+			if (file->fil_name == expanded2 || expanded == expanded2)
 			{
 				BURP_error(9, true);
 				// msg 9 mutiple sources or destinations specified
@@ -1331,22 +1344,7 @@ int gbak(Firebird::UtilSvc* uSvc)
 		tdgbl->output_file = NULL;
 	}
 
-	// Free all unfreed memory used by GBAK itself
-	while (tdgbl->head_of_mem_list != NULL)
-	{
-		UCHAR* mem = tdgbl->head_of_mem_list;
-		tdgbl->head_of_mem_list = *((UCHAR **) tdgbl->head_of_mem_list);
-		gds__free(mem);
-	}
-
 	BurpGlobals::restoreSpecific();
-
-#if defined(DEBUG_GDS_ALLOC)
-	if (!uSvc->isService())
-	{
-		gds_alloc_report(0 ALLOC_ARGS);
-	}
-#endif
 
 	return exit_code;
 }
@@ -2410,13 +2408,15 @@ void BurpGlobals::setupSkipData(const Firebird::string& regexp)
 			if (!uSvc->utf8FileNames())
 				ISC_systemToUtf8(filter);
 
+			BurpGlobals* tdgbl = BurpGlobals::getSpecific();
 			if (!unicodeCollation)
-				unicodeCollation = FB_NEW UnicodeCollationHolder(*getDefaultMemoryPool());
+				unicodeCollation = FB_NEW_POOL(tdgbl->getPool()) UnicodeCollationHolder(tdgbl->getPool());
 
 			Jrd::TextType* const textType = unicodeCollation->getTextType();
 
-			skipDataMatcher.reset(FB_NEW Firebird::SimilarToMatcher<UCHAR, Jrd::UpcaseConverter<> >(
-				*getDefaultMemoryPool(), textType, (const UCHAR*) filter.c_str(),
+			skipDataMatcher.reset(FB_NEW_POOL(tdgbl->getPool())
+				Firebird::SimilarToMatcher<UCHAR, Jrd::UpcaseConverter<> >
+				(tdgbl->getPool(), textType, (const UCHAR*) filter.c_str(),
 				filter.length(), '\\', true));
 		}
 	}

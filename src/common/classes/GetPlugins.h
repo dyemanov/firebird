@@ -142,6 +142,28 @@ private:
 	}
 };
 
+// template required to use AutoPtr for plugins
+
+template <typename P>
+class ReleasePlugin
+{
+public:
+	static void clear(P* ptr)
+	{
+		if (ptr)
+			PluginManagerInterfacePtr()->releasePlugin(ptr);
+	}
+};
+
+template <typename P>
+class AutoPlugin : public AutoPtr<P, ReleasePlugin>
+{
+public:
+	AutoPlugin(P* p = NULL)
+		: AutoPtr<P, ReleasePlugin>(p)
+	{ }
+};
+
 } // namespace Firebird
 
 

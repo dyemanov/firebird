@@ -69,6 +69,7 @@ namespace Firebird
 	class IListUsers;
 	class ILogonInfo;
 	class IManagement;
+	class IAuthBlock;
 	class IWireCryptPlugin;
 	class ICryptKeyCallback;
 	class IKeyHolderPlugin;
@@ -731,6 +732,7 @@ namespace Firebird
 		struct VTable : public IVersioned::VTable
 		{
 			void (CLOOP_CARG *doClean)(IPluginModule* self) throw();
+			void (CLOOP_CARG *threadDetach)(IPluginModule* self) throw();
 		};
 
 	protected:
@@ -744,11 +746,20 @@ namespace Firebird
 		}
 
 	public:
-		static const unsigned VERSION = 2;
+		static const unsigned VERSION = 3;
 
 		void doClean()
 		{
 			static_cast<VTable*>(this->cloopVTable)->doClean(this);
+		}
+
+		void threadDetach()
+		{
+			if (cloopVTable->version < 3)
+			{
+				return;
+			}
+			static_cast<VTable*>(this->cloopVTable)->threadDetach(this);
 		}
 	};
 
@@ -2284,6 +2295,7 @@ namespace Firebird
 			const unsigned char* (CLOOP_CARG *getData)(IClientBlock* self, unsigned* length) throw();
 			void (CLOOP_CARG *putData)(IClientBlock* self, IStatus* status, unsigned length, const void* data) throw();
 			ICryptKey* (CLOOP_CARG *newKey)(IClientBlock* self, IStatus* status) throw();
+			IAuthBlock* (CLOOP_CARG *getAuthBlock)(IClientBlock* self, IStatus* status) throw();
 		};
 
 	protected:
@@ -2297,7 +2309,7 @@ namespace Firebird
 		}
 
 	public:
-		static const unsigned VERSION = 3;
+		static const unsigned VERSION = 4;
 
 		const char* getLogin()
 		{
@@ -2328,6 +2340,20 @@ namespace Firebird
 		{
 			StatusType::clearException(status);
 			ICryptKey* ret = static_cast<VTable*>(this->cloopVTable)->newKey(this, status);
+			StatusType::checkException(status);
+			return ret;
+		}
+
+		template <typename StatusType> IAuthBlock* getAuthBlock(StatusType* status)
+		{
+			if (cloopVTable->version < 4)
+			{
+				StatusType::setVersionError(status, "IClientBlock", cloopVTable->version, 4);
+				StatusType::checkException(status);
+				return 0;
+			}
+			StatusType::clearException(status);
+			IAuthBlock* ret = static_cast<VTable*>(this->cloopVTable)->getAuthBlock(this, status);
 			StatusType::checkException(status);
 			return ret;
 		}
@@ -2764,6 +2790,80 @@ namespace Firebird
 			StatusType::clearException(status);
 			static_cast<VTable*>(this->cloopVTable)->rollback(this, status);
 			StatusType::checkException(status);
+		}
+	};
+
+	class IAuthBlock : public IVersioned
+	{
+	public:
+		struct VTable : public IVersioned::VTable
+		{
+			const char* (CLOOP_CARG *getType)(IAuthBlock* self) throw();
+			const char* (CLOOP_CARG *getName)(IAuthBlock* self) throw();
+			const char* (CLOOP_CARG *getPlugin)(IAuthBlock* self) throw();
+			const char* (CLOOP_CARG *getSecurityDb)(IAuthBlock* self) throw();
+			const char* (CLOOP_CARG *getOriginalPlugin)(IAuthBlock* self) throw();
+			FB_BOOLEAN (CLOOP_CARG *next)(IAuthBlock* self, IStatus* status) throw();
+			FB_BOOLEAN (CLOOP_CARG *first)(IAuthBlock* self, IStatus* status) throw();
+		};
+
+	protected:
+		IAuthBlock(DoNotInherit)
+			: IVersioned(DoNotInherit())
+		{
+		}
+
+		~IAuthBlock()
+		{
+		}
+
+	public:
+		static const unsigned VERSION = 2;
+
+		const char* getType()
+		{
+			const char* ret = static_cast<VTable*>(this->cloopVTable)->getType(this);
+			return ret;
+		}
+
+		const char* getName()
+		{
+			const char* ret = static_cast<VTable*>(this->cloopVTable)->getName(this);
+			return ret;
+		}
+
+		const char* getPlugin()
+		{
+			const char* ret = static_cast<VTable*>(this->cloopVTable)->getPlugin(this);
+			return ret;
+		}
+
+		const char* getSecurityDb()
+		{
+			const char* ret = static_cast<VTable*>(this->cloopVTable)->getSecurityDb(this);
+			return ret;
+		}
+
+		const char* getOriginalPlugin()
+		{
+			const char* ret = static_cast<VTable*>(this->cloopVTable)->getOriginalPlugin(this);
+			return ret;
+		}
+
+		template <typename StatusType> FB_BOOLEAN next(StatusType* status)
+		{
+			StatusType::clearException(status);
+			FB_BOOLEAN ret = static_cast<VTable*>(this->cloopVTable)->next(this, status);
+			StatusType::checkException(status);
+			return ret;
+		}
+
+		template <typename StatusType> FB_BOOLEAN first(StatusType* status)
+		{
+			StatusType::clearException(status);
+			FB_BOOLEAN ret = static_cast<VTable*>(this->cloopVTable)->first(this, status);
+			StatusType::checkException(status);
+			return ret;
 		}
 	};
 
@@ -6463,6 +6563,7 @@ namespace Firebird
 				{
 					this->version = Base::VERSION;
 					this->doClean = &Name::cloopdoCleanDispatcher;
+					this->threadDetach = &Name::cloopthreadDetachDispatcher;
 				}
 			} vTable;
 
@@ -6474,6 +6575,18 @@ namespace Firebird
 			try
 			{
 				static_cast<Name*>(self)->Name::doClean();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+			}
+		}
+
+		static void CLOOP_CARG cloopthreadDetachDispatcher(IPluginModule* self) throw()
+		{
+			try
+			{
+				static_cast<Name*>(self)->Name::threadDetach();
 			}
 			catch (...)
 			{
@@ -6496,6 +6609,7 @@ namespace Firebird
 		}
 
 		virtual void doClean() = 0;
+		virtual void threadDetach() = 0;
 	};
 
 	template <typename Name, typename StatusType, typename Base>
@@ -9704,6 +9818,7 @@ namespace Firebird
 					this->getData = &Name::cloopgetDataDispatcher;
 					this->putData = &Name::cloopputDataDispatcher;
 					this->newKey = &Name::cloopnewKeyDispatcher;
+					this->getAuthBlock = &Name::cloopgetAuthBlockDispatcher;
 				}
 			} vTable;
 
@@ -9778,6 +9893,21 @@ namespace Firebird
 			}
 		}
 
+		static IAuthBlock* CLOOP_CARG cloopgetAuthBlockDispatcher(IClientBlock* self, IStatus* status) throw()
+		{
+			StatusType status2(status);
+
+			try
+			{
+				return static_cast<Name*>(self)->Name::getAuthBlock(&status2);
+			}
+			catch (...)
+			{
+				StatusType::catchException(&status2);
+				return static_cast<IAuthBlock*>(0);
+			}
+		}
+
 		static void CLOOP_CARG cloopaddRefDispatcher(IReferenceCounted* self) throw()
 		{
 			try
@@ -9822,6 +9952,7 @@ namespace Firebird
 		virtual const unsigned char* getData(unsigned* length) = 0;
 		virtual void putData(StatusType* status, unsigned length, const void* data) = 0;
 		virtual ICryptKey* newKey(StatusType* status) = 0;
+		virtual IAuthBlock* getAuthBlock(StatusType* status) = 0;
 	};
 
 	template <typename Name, typename StatusType, typename Base>
@@ -10865,6 +10996,150 @@ namespace Firebird
 		virtual int execute(StatusType* status, IUser* user, IListUsers* callback) = 0;
 		virtual void commit(StatusType* status) = 0;
 		virtual void rollback(StatusType* status) = 0;
+	};
+
+	template <typename Name, typename StatusType, typename Base>
+	class IAuthBlockBaseImpl : public Base
+	{
+	public:
+		typedef IAuthBlock Declaration;
+
+		IAuthBlockBaseImpl(DoNotInherit = DoNotInherit())
+		{
+			static struct VTableImpl : Base::VTable
+			{
+				VTableImpl()
+				{
+					this->version = Base::VERSION;
+					this->getType = &Name::cloopgetTypeDispatcher;
+					this->getName = &Name::cloopgetNameDispatcher;
+					this->getPlugin = &Name::cloopgetPluginDispatcher;
+					this->getSecurityDb = &Name::cloopgetSecurityDbDispatcher;
+					this->getOriginalPlugin = &Name::cloopgetOriginalPluginDispatcher;
+					this->next = &Name::cloopnextDispatcher;
+					this->first = &Name::cloopfirstDispatcher;
+				}
+			} vTable;
+
+			this->cloopVTable = &vTable;
+		}
+
+		static const char* CLOOP_CARG cloopgetTypeDispatcher(IAuthBlock* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getType();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<const char*>(0);
+			}
+		}
+
+		static const char* CLOOP_CARG cloopgetNameDispatcher(IAuthBlock* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getName();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<const char*>(0);
+			}
+		}
+
+		static const char* CLOOP_CARG cloopgetPluginDispatcher(IAuthBlock* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getPlugin();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<const char*>(0);
+			}
+		}
+
+		static const char* CLOOP_CARG cloopgetSecurityDbDispatcher(IAuthBlock* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getSecurityDb();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<const char*>(0);
+			}
+		}
+
+		static const char* CLOOP_CARG cloopgetOriginalPluginDispatcher(IAuthBlock* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getOriginalPlugin();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<const char*>(0);
+			}
+		}
+
+		static FB_BOOLEAN CLOOP_CARG cloopnextDispatcher(IAuthBlock* self, IStatus* status) throw()
+		{
+			StatusType status2(status);
+
+			try
+			{
+				return static_cast<Name*>(self)->Name::next(&status2);
+			}
+			catch (...)
+			{
+				StatusType::catchException(&status2);
+				return static_cast<FB_BOOLEAN>(0);
+			}
+		}
+
+		static FB_BOOLEAN CLOOP_CARG cloopfirstDispatcher(IAuthBlock* self, IStatus* status) throw()
+		{
+			StatusType status2(status);
+
+			try
+			{
+				return static_cast<Name*>(self)->Name::first(&status2);
+			}
+			catch (...)
+			{
+				StatusType::catchException(&status2);
+				return static_cast<FB_BOOLEAN>(0);
+			}
+		}
+	};
+
+	template <typename Name, typename StatusType, typename Base = IVersionedImpl<Name, StatusType, Inherit<IAuthBlock> > >
+	class IAuthBlockImpl : public IAuthBlockBaseImpl<Name, StatusType, Base>
+	{
+	protected:
+		IAuthBlockImpl(DoNotInherit = DoNotInherit())
+		{
+		}
+
+	public:
+		virtual ~IAuthBlockImpl()
+		{
+		}
+
+		virtual const char* getType() = 0;
+		virtual const char* getName() = 0;
+		virtual const char* getPlugin() = 0;
+		virtual const char* getSecurityDb() = 0;
+		virtual const char* getOriginalPlugin() = 0;
+		virtual FB_BOOLEAN next(StatusType* status) = 0;
+		virtual FB_BOOLEAN first(StatusType* status) = 0;
 	};
 
 	template <typename Name, typename StatusType, typename Base>

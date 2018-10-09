@@ -592,7 +592,7 @@ without specifying a character set.', NULL);
 ('optimizer_between_err', 'decompose', 'OPT.C', NULL, 0, 493, NULL, 'Unsupported field type specified in BETWEEN predicate.', NULL, NULL);
 ('service_not_supported', 'SVC_attach', 'svc.c', NULL, 0, 494, NULL, 'Services functionality will be supported in a later version  of the product', NULL, NULL);
 ('generator_name', 'check_dependencies', 'dfw.e', NULL, 0, 495, NULL, 'GENERATOR @1', NULL, NULL);
-('udf_name', 'check_dependencies', 'dfw.e', NULL, 0, 496, NULL, 'UDF @1', NULL, NULL);
+('udf_name', 'check_dependencies', 'dfw.e', NULL, 0, 496, NULL, 'Function @1', NULL, NULL);
 ('bad_limit_param', 'RSE_open', 'rse.c', NULL, 0, 497, NULL, 'Invalid parameter to FETCH or FIRST. Only integers >= 0 are allowed.', NULL, NULL);
 ('bad_skip_param', 'RSE_open', 'rse.c', NULL, 0, 498, NULL, 'Invalid parameter to OFFSET or SKIP. Only integers >= 0 are allowed.', NULL, NULL);
 ('io_32bit_exceeded_err', 'seek_file', 'unix.c', NULL, 0, 499, NULL, 'File exceeded maximum size of 2GB.  Add another database file or use a 64 bit I/O version of Firebird.', NULL, NULL);
@@ -896,7 +896,7 @@ Data source : @4', NULL, NULL)
 ('login_error', NULL, 'server.cpp', NULL, 0, 786, NULL, 'Error occurred during login, please check server firebird.log for details', NULL, NULL);
 ('already_opened', 'lockDatabaseFile', 'unix.cpp', NULL, 0, 787, NULL, 'Database already opened with engine instance, incompatible with current', NULL, NULL);
 ('bad_crypt_key', NULL, 'CryptoManager.cpp', NULL, 0, 788, NULL, 'Invalid crypt key @1', NULL, NULL);
-('encrypt_error', NULL, 'CryptoManager.cpp', NULL, 0, 789, NULL, 'Page requires encyption but crypt plugin is missing', NULL, NULL);
+('encrypt_error', NULL, 'CryptoManager.cpp', NULL, 0, 789, NULL, 'Page requires encryption but crypt plugin is missing', NULL, NULL);
 -- QLI
 (NULL, NULL, NULL, NULL, 1, 0, NULL, 'expected type', NULL, NULL);
 (NULL, NULL, NULL, NULL, 1, 1, NULL, 'bad block type', NULL, NULL);
@@ -1970,6 +1970,19 @@ COMMIT WORK;
 ('dyn_cant_use_in_foreignkey', NULL, 'DdlNodes.epp', NULL, 8, 289, NULL, 'Can''t use @1 in FOREIGN KEY constraint', NULL, NULL);
 ('dyn_defvaldecl_package_func', 'CreatePackageBodyNode::execute', 'PackageNodes.epp', NULL, 8, 290, NULL, 'Default values for parameters are allowed only in declaration of packaged function @1.@2', NULL, NULL);
 ('dyn_create_user_no_password', 'CreateAlterUserNode', 'DdlNodes.epp', NULL, 8, 291, NULL, 'Password must be specified when creating user', NULL, NULL);
+('dyn_concur_alter_database', 'AlterDatabaseNode::execute', 'DdlNodes.epp', NULL, 8, 297, NULL, 'Concurrent ALTER DATABASE is not supported', NULL, NULL);
+('dyn_incompat_alter_database', 'AlterDatabaseNode::execute', 'DdlNodes.epp', NULL, 8, 298, NULL, 'Incompatible ALTER DATABASE clauses: ''@1'' and ''@2''', NULL, NULL);
+(NULL, 'checkGrantorCanGrantObject', 'DdlNodes.epp', NULL, 8, 299, NULL, 'no @1 privilege with grant option on DDL @2', NULL, NULL);
+(NULL, 'checkGrantorCanGrantObject', 'DdlNodes.epp', NULL, 8, 300, NULL, 'no @1 privilege with grant option on object @2', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 301, NULL, 'Function @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 302, NULL, 'Procedure @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 303, NULL, 'Package @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 304, NULL, 'Trigger @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 305, NULL, 'View @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 306, NULL, 'Table @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 307, NULL, 'Exception @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 308, NULL, 'Generator/Sequence @1 does not exist', NULL, NULL);
+(NULL, 'GrantRevokeNode::grantRevoke', 'DdlNodes.epp', NULL, 8, 309, NULL, 'Field @1 of table @2 does not exist', NULL, NULL);
 COMMIT WORK;
 -- TEST
 (NULL, 'main', 'test.c', NULL, 11, 0, NULL, 'This is a modified text message', NULL, NULL);
@@ -3224,6 +3237,8 @@ Analyzing database pages ...', NULL, NULL);
 (NULL, 'main', 'dba.epp', NULL, 21, 56, NULL, '    Empty pages: @1, full pages: @2', NULL, NULL);
 (NULL, 'dba_in_sw_table', 'dbaswi.h', NULL, 21, 57, NULL, '    -role   SQL role name', NULL, NULL);
 (NULL, 'main', 'dba.epp', NULL, 21, 58, NULL, 'Other pages: total @1, ENCRYPTED @2 (DB problem!), non-crypted @3', NULL, NULL)
+(NULL, 'main', 'dba.epp', NULL, 21, 59, NULL, 'Gstat execution time @1', NULL, NULL)
+(NULL, 'main', 'dba.epp', NULL, 21, 60, NULL, 'Gstat completion time @1', NULL, NULL)
 -- FBSVCMGR
 -- All messages use the new format.
 ('fbsvcmgr_bad_am', 'putAccessMode', 'fbsvcmgr.cpp', NULL, 22, 1, NULL, 'Wrong value for access mode', NULL, NULL);

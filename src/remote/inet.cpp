@@ -1036,11 +1036,13 @@ static rem_port* listener_socket(rem_port* port, USHORT flag, const addrinfo* pa
 		{
 			inet_error(true, port, "setsockopt LINGER", isc_net_connect_listen_err, INET_ERRNO);
 		}
+	}
 
-		if (! setNoNagleOption(port))
-		{
-			inet_error(true, port, "setsockopt TCP_NODELAY", isc_net_connect_listen_err, INET_ERRNO);
-		}
+	// RS: In linux sockets inherit this option from listener. Previously CLASSIC had no its own listen socket
+	// Now it's necessary to respect the option via listen socket.
+	if (! setNoNagleOption(port))
+	{
+		inet_error(true, port, "setsockopt TCP_NODELAY", isc_net_connect_listen_err, INET_ERRNO);
 	}
 
 	// On Linux platform, when the server dies the system holds a port
@@ -1658,6 +1660,9 @@ static void disconnect(rem_port* const port)
 	}
 
 	MutexLockGuard guard(port_mutex, FB_FUNCTION);
+	if (port->port_state == rem_port::DISCONNECTED)
+		return;
+
 	port->port_state = rem_port::DISCONNECTED;
 	port->port_flags &= ~PORT_connecting;
 
@@ -1692,7 +1697,10 @@ static void disconnect(rem_port* const port)
 		SOCLOSE(port->port_channel);
 	}
 
-	port->release();
+	if (port->port_thread_guard && port->port_events_thread && !Thread::isCurrent(port->port_events_threadId))
+		port->port_thread_guard->setWait(port->port_events_thread);
+	else
+		port->release();
 
 #ifdef DEBUG
 	if (INET_trace & TRACE_summary)
@@ -2086,6 +2094,8 @@ static void select_port(rem_port* main_port, Select* selct, RemPortPtr& port)
 		{
 		case Select::SEL_BAD:
 			if (port->port_state == rem_port::BROKEN || (port->port_flags & PORT_connecting))
+				continue;
+			if (port->port_flags & PORT_async)
 				continue;
 			return;
 
@@ -2871,7 +2881,8 @@ static bool packet_receive(rem_port* port, UCHAR* buffer, SSHORT buffer_length, 
 	const SOCKET ph = port->port_handle;
 	if (ph == INVALID_SOCKET)
 	{
-		if (!(port->port_flags & PORT_disconnect))
+		const bool releasePort = (port->port_flags & PORT_server);
+		if (!(port->port_flags & PORT_disconnect) && releasePort)
 			inet_error(true, port, "invalid socket in packet_receive", isc_net_read_err, EINVAL);
 
 		return false;

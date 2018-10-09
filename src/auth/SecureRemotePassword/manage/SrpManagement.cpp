@@ -676,7 +676,7 @@ private:
 	Firebird::RefPtr<Firebird::IFirebirdConf> config;
 	Firebird::RefPtr<Firebird::IAttachment> att;
 	Firebird::RefPtr<Firebird::ITransaction> tra;
-	RemotePassword server;
+	RemotePasswordImpl<Firebird::Sha1> server;
 	int upCount, delCount;
 
 	bool checkCount(Firebird::CheckStatusWrapper* status, int* count, UCHAR item)

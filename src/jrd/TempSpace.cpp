@@ -39,7 +39,7 @@ using namespace Firebird;
 
 const size_t MIN_TEMP_BLOCK_SIZE = 64 * 1024;
 
-GlobalPtr<Mutex> TempSpace::initMutex;
+GlobalPtr<Mutex> TempSpace::globalMutex;
 TempDirectoryList* TempSpace::tempDirs = NULL;
 FB_SIZE_T TempSpace::minBlockSize = 0;
 offset_t TempSpace::globalCacheUsage = 0;
@@ -107,7 +107,7 @@ TempSpace::TempSpace(MemoryPool& p, const PathName& prefix, bool dynamic)
 {
 	if (!tempDirs)
 	{
-		MutexLockGuard guard(initMutex, FB_FUNCTION);
+		MutexLockGuard guard(globalMutex, FB_FUNCTION);
 		if (!tempDirs)
 		{
 			MemoryPool& def_pool = *getDefaultMemoryPool();
@@ -137,12 +137,13 @@ TempSpace::~TempSpace()
 		head = temp;
 	}
 
-	globalCacheUsage -= localCacheUsage;
+	{	// scope
+		MutexLockGuard guard(globalMutex, FB_FUNCTION);
+		globalCacheUsage -= localCacheUsage;
+	}
 
 	while (tempFiles.getCount())
-	{
 		delete tempFiles.pop();
-	}
 }
 
 //
@@ -275,18 +276,22 @@ void TempSpace::extend(FB_SIZE_T size)
 
 		Block* block = NULL;
 
-		if (globalCacheUsage + size <= size_t(Config::getTempCacheLimit()))
-		{
-			try
+		{	// scope
+			MutexLockGuard guard(globalMutex, FB_FUNCTION);
+
+			if (globalCacheUsage + size <= size_t(Config::getTempCacheLimit()))
 			{
-				// allocate block in virtual memory
-				block = FB_NEW_POOL(pool) MemoryBlock(FB_NEW_POOL(pool) UCHAR[size], tail, size);
-				localCacheUsage += size;
-				globalCacheUsage += size;
-			}
-			catch (const BadAlloc&)
-			{
-				// not enough memory
+				try
+				{
+					// allocate block in virtual memory
+					block = FB_NEW_POOL(pool) MemoryBlock(FB_NEW_POOL(pool) UCHAR[size], tail, size);
+					localCacheUsage += size;
+					globalCacheUsage += size;
+				}
+				catch (const BadAlloc&)
+				{
+					// not enough memory
+				}
 			}
 		}
 

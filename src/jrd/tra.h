@@ -105,6 +105,7 @@ struct BlobIndex
 };
 
 typedef Firebird::BePlusTree<BlobIndex, ULONG, MemoryPool, BlobIndex> BlobIndexTree;
+typedef Firebird::BePlusTree<bid, bid, MemoryPool> FetchedBlobIdTree;
 
 // Transaction block
 
@@ -165,6 +166,7 @@ public:
 		tra_memory_stats(parent_stats),
 		tra_blobs_tree(p),
 		tra_blobs(outer ? outer->tra_blobs : &tra_blobs_tree),
+		tra_fetched_blobs(p),
 		tra_arrays(NULL),
 		tra_deferred_job(NULL),
 		tra_resources(*p),
@@ -255,8 +257,10 @@ public:
 	Firebird::MemoryStats	tra_memory_stats;
 	BlobIndexTree tra_blobs_tree;		// list of active blobs
 	BlobIndexTree* tra_blobs;			// pointer to actual list of active blobs
+	FetchedBlobIdTree tra_fetched_blobs;	// list of fetched blobs
 	ArrayField*	tra_arrays;				// Linked list of active arrays
 	Lock*		tra_lock;				// lock for transaction
+	Lock*		tra_alter_db_lock;		// lock for ALTER DATABASE statement(s)
 	vec<Lock*>*			tra_relation_locks;	// locks for relations
 	TransactionBitmap*	tra_commit_sub_trans;	// committed sub-transactions
 	Savepoint*	tra_save_point;			// list of savepoints
@@ -368,6 +372,7 @@ public:
 	void eraseSecDbContext();
 	MappingList* getMappingList();
 	DbCreatorsList* getDbCreatorsList();
+	void checkBlob(thread_db* tdbb, const bid* blob_id, bool punt);
 
 	GenIdCache* getGenIdCache()
 	{

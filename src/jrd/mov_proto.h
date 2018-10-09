@@ -52,4 +52,23 @@ Firebird::string MOV_make_string2(Jrd::thread_db* tdbb, const dsc* desc, USHORT 
 	bool limit = true);
 void	MOV_move(Jrd::thread_db*, /*const*/ dsc*, dsc*);
 
+namespace Jrd
+{
+class DescPrinter
+{
+public:
+	DescPrinter(thread_db* tdbb, const dsc* desc, int mLen);
+
+	const Firebird::string& get() const
+	{
+		return value;
+	}
+
+private:
+	Firebird::string value;
+	int maxLen;
+};
+
+}; // namespace Jrd
+
 #endif // JRD_MOV_PROTO_H

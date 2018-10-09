@@ -380,7 +380,7 @@ Function* Function::loadMetadata(thread_db* tdbb, USHORT id, bool noscan, USHORT
 			if (!X.RDB$MODULE_NAME.NULL && !X.RDB$ENTRYPOINT.NULL)
 			{
 				function->fun_entrypoint =
-					Module::lookup(X.RDB$MODULE_NAME, X.RDB$ENTRYPOINT, dbb->dbb_modules);
+					Module::lookup(X.RDB$MODULE_NAME, X.RDB$ENTRYPOINT, dbb);
 
 				// Could not find a function with given MODULE, ENTRYPOINT.
 				// Try the list of internally implemented functions.
