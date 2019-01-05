@@ -36,6 +36,7 @@
 #include "../jrd/extds/ExtDS.h"
 #include "../jrd/recsrc/RecordSource.h"
 #include "../jrd/recsrc/Cursor.h"
+#include "../jrd/replication/Publisher.h"
 #include "../jrd/trace/TraceManager.h"
 #include "../jrd/trace/TraceJrdHelpers.h"
 #include "../jrd/cmp_proto.h"
@@ -2628,7 +2629,10 @@ const StmtNode* EraseNode::erase(thread_db* tdbb, jrd_req* request, WhichTrigger
 	else if (relation->isVirtual())
 		VirtualTable::erase(tdbb, rpb);
 	else if (!relation->rel_view_rse)
+	{
 		VIO_erase(tdbb, rpb, transaction);
+		REPL_erase(tdbb, rpb, transaction);
+	}
 
 	// Handle post operation trigger.
 	if (relation->rel_post_erase && whichTrig != PRE_TRIG)
@@ -6408,6 +6412,7 @@ const StmtNode* ModifyNode::modify(thread_db* tdbb, jrd_req* request, WhichTrigg
 				{
 					VIO_modify(tdbb, orgRpb, newRpb, transaction);
 					IDX_modify(tdbb, orgRpb, newRpb, transaction);
+					REPL_modify(tdbb, orgRpb, newRpb, transaction);
 				}
 
 				newRpb->rpb_number = orgRpb->rpb_number;
@@ -7291,6 +7296,7 @@ const StmtNode* StoreNode::store(thread_db* tdbb, jrd_req* request, WhichTrigger
 				{
 					VIO_store(tdbb, rpb, transaction);
 					IDX_store(tdbb, rpb, transaction);
+					REPL_store(tdbb, rpb, transaction);
 				}
 
 				rpb->rpb_number.setValid(true);

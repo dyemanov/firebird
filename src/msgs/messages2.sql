@@ -1003,6 +1003,7 @@ Data source : @4', NULL, NULL)
 ('invalid_timezone_offset', NULL, 'TimeZoneUtil.cpp', NULL, 0, 893, NULL, 'Invalid time zone offset: @1 - must be between -14:00 and +14:00', NULL, NULL);
 ('invalid_timezone_region', NULL, 'TimeZoneUtil.cpp', NULL, 0, 894, NULL, 'Invalid time zone region: @1', NULL, NULL);
 ('invalid_timezone_id', NULL, 'TimeZoneUtil.cpp', NULL, 0, 895, NULL, 'Invalid time zone ID: @1', NULL, NULL);
+('bad_repl_handle', NULL, 'jrd.cpp', NULL, 0, 896, NULL, 'invalid replicator handle', NULL, NULL);
 -- QLI
 (NULL, NULL, NULL, NULL, 1, 0, NULL, 'expected type', NULL, NULL);
 (NULL, NULL, NULL, NULL, 1, 1, NULL, 'bad block type', NULL, NULL);
@@ -1749,6 +1750,8 @@ COMMIT WORK;
 ('gfix_opt_icu', 'ALICE_gfix', 'alice.c', NULL, 3, 131, NULL, '   -icu                 fix database to be usable with present ICU version', NULL, NULL);
 ('gfix_opt_role', 'ALICE_gfix', 'alice.c', NULL, 3, 132, NULL, '   -role                set SQL role name', NULL, NULL);
 ('gfix_role_req', 'ALICE_gfix', 'alice.c', NULL, 3, 133, NULL, 'SQL role name required', NULL, NULL);
+('gfix_opt_repl', 'ALICE_gfix', 'alice.c', NULL, 3, 134, NULL, '   -repl(ica)           replica mode <none / read_only / read_write>', NULL, NULL);
+('gfix_repl_mode_req', 'ALICE_gfix', 'alice.c', NULL, 3, 135, NULL, 'replica mode (none / read_only / read_write) required', NULL, NULL);
 -- DSQL
 ('dsql_dbkey_from_non_table', 'MAKE_desc', 'make.c', NULL, 7, 2, NULL, 'Cannot SELECT RDB$DB_KEY from a stored procedure.', NULL, NULL);
 ('dsql_transitional_numeric', 'dsql_yyparse', 'parse.y', NULL, 7, 3, NULL, 'Precision 10 to 18 changed from DOUBLE PRECISION in SQL dialect 1 to 64-bit scaled integer in SQL dialect 3', NULL, NULL);

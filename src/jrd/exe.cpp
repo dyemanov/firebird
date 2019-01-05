@@ -639,9 +639,8 @@ void EXE_receive(thread_db* tdbb,
 
 	jrd_tra* transaction = request->req_transaction;
 
-	if (!(request->req_flags & req_active)) {
+	if (!(request->req_flags & req_active))
 		ERR_post(Arg::Gds(isc_req_sync));
-	}
 
 	const SavNumber mergeSavNumber = transaction->tra_save_point ?
 		transaction->tra_save_point->getNumber() : 0;

@@ -929,6 +929,8 @@ fixFilePermissions() {
 	cd @FB_LOGDIR@
     touch firebird.log
     MakeFileFirebirdWritable firebird.log
+    touch replication.log
+    MakeFileFirebirdWritable replication.log
 
     # Security database
 	cd @FB_SECDBDIR@

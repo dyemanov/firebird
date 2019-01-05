@@ -60,13 +60,16 @@ SLONG	PAG_last_page(Jrd::thread_db* tdbb);
 void	PAG_release_page(Jrd::thread_db* tdbb, const Jrd::PageNumber&, const Jrd::PageNumber&);
 void	PAG_release_pages(Jrd::thread_db* tdbb, USHORT pageSpaceID, int cntRelease,
 			const ULONG* pgNums, const ULONG prior_page);
+void	PAG_set_db_guid(Jrd::thread_db* tdbb, const Firebird::Guid&);
 void	PAG_set_force_write(Jrd::thread_db* tdbb, bool);
 void	PAG_set_no_reserve(Jrd::thread_db* tdbb, bool);
 void	PAG_set_db_readonly(Jrd::thread_db* tdbb, bool);
+void	PAG_set_db_replica(Jrd::thread_db* tdbb, ReplicaMode);
 void	PAG_set_db_SQL_dialect(Jrd::thread_db* tdbb, SSHORT);
 void	PAG_set_page_buffers(Jrd::thread_db* tdbb, ULONG);
 void	PAG_set_page_scn(Jrd::thread_db* tdbb, Jrd::win* window);
-void	PAG_sweep_interval(Jrd::thread_db* tdbb, SLONG);
+void	PAG_set_repl_sequence(Jrd::thread_db* tdbb, FB_UINT64);
+void	PAG_set_sweep_interval(Jrd::thread_db* tdbb, SLONG);
 ULONG	PAG_page_count(Jrd::thread_db*);
 
 #endif // JRD_PAG_PROTO_H

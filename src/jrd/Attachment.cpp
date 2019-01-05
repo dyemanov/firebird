@@ -234,6 +234,7 @@ Jrd::Attachment::Attachment(MemoryPool* pool, Database* dbb)
 	  att_utility(UTIL_NONE),
 	  att_procedures(*pool),
 	  att_functions(*pool),
+	  att_generators(*pool),
 	  att_internal(*pool),
 	  att_dyn_req(*pool),
 	  att_dec_status(DecimalStatus::DEFAULT),

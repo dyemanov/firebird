@@ -920,6 +920,7 @@ Data source : @4"},		/* eds_statement */
 	{335545213, "Invalid time zone offset: @1 - must be between -14:00 and +14:00"},		/* invalid_timezone_offset */
 	{335545214, "Invalid time zone region: @1"},		/* invalid_timezone_region */
 	{335545215, "Invalid time zone ID: @1"},		/* invalid_timezone_id */
+	{335545216, "invalid replicator handle"},		/* bad_repl_handle */
 	{335740929, "data base file name (@1) already given"},		/* gfix_db_name */
 	{335740930, "invalid switch @1"},		/* gfix_invalid_sw */
 	{335740932, "incompatible switch combination"},		/* gfix_incmp_sw */

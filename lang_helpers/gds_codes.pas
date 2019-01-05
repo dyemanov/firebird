@@ -1837,6 +1837,8 @@ const
 	gds_invalid_timezone_region          = 335545214;
 	isc_invalid_timezone_id              = 335545215;
 	gds_invalid_timezone_id              = 335545215;
+	isc_bad_repl_handle                  = 335545216;
+	gds_bad_repl_handle                  = 335545216;
 	isc_gfix_db_name                     = 335740929;
 	gds_gfix_db_name                     = 335740929;
 	isc_gfix_invalid_sw                  = 335740930;

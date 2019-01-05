@@ -296,6 +296,12 @@ enum InfoType
 	MAX_INFO_TYPE
 };
 
+enum ReplicaMode {
+	REPLICA_NONE = 0,
+	REPLICA_READ_ONLY = 1,
+	REPLICA_READ_WRITE = 2
+};
+
 enum TriggerType {
 	PRE_STORE_TRIGGER = 1,
 	POST_STORE_TRIGGER = 2,

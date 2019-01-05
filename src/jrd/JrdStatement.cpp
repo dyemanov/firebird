@@ -68,7 +68,7 @@ JrdStatement::JrdStatement(thread_db* tdbb, MemoryPool* p, CompilerScratch* csb)
 		makeSubRoutines(tdbb, this, csb, csb->subProcedures);
 		makeSubRoutines(tdbb, this, csb, csb->subFunctions);
 
-		topNode = (csb->csb_node->getKind() == DmlNode::KIND_STATEMENT) ?
+		topNode = (csb->csb_node && csb->csb_node->getKind() == DmlNode::KIND_STATEMENT) ?
 			static_cast<StmtNode*>(csb->csb_node) : NULL;
 
 		accessList = csb->csb_access;
@@ -234,10 +234,13 @@ JrdStatement* JrdStatement::makeStatement(thread_db* tdbb, CompilerScratch* csb,
 			DmlNode::doPass1(tdbb, csb, fieldInfo.validationExpr.getAddress());
 		}
 
-		if (csb->csb_node->getKind() == DmlNode::KIND_STATEMENT)
-			StmtNode::doPass2(tdbb, csb, reinterpret_cast<StmtNode**>(&csb->csb_node), NULL);
-		else
-			ExprNode::doPass2(tdbb, csb, &csb->csb_node);
+		if (csb->csb_node)
+		{
+			if (csb->csb_node->getKind() == DmlNode::KIND_STATEMENT)
+				StmtNode::doPass2(tdbb, csb, reinterpret_cast<StmtNode**>(&csb->csb_node), NULL);
+			else
+				ExprNode::doPass2(tdbb, csb, &csb->csb_node);
+		}
 
 		// Compile (pass2) domains DEFAULT and constraints
 		for (bool found = accessor.getFirst(); found; found = accessor.getNext())

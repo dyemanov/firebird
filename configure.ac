@@ -1256,6 +1256,7 @@ gen/$fb_tgt/firebird/databases.conf:builds/install/misc/databases.conf.in
 gen/$fb_tgt/firebird/fbtrace.conf:src/utilities/ntrace/fbtrace.conf
 gen/$fb_tgt/firebird/intl/fbintl.conf:builds/install/misc/fbintl.conf
 gen/$fb_tgt/firebird/plugins.conf:builds/install/misc/plugins.conf
+gen/$fb_tgt/firebird/replication.conf:builds/install/misc/replication.conf
 ])
 done
 

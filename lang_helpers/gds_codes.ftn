@@ -1842,6 +1842,8 @@ C --
       PARAMETER (GDS__invalid_timezone_region          = 335545214)
       INTEGER*4 GDS__invalid_timezone_id             
       PARAMETER (GDS__invalid_timezone_id              = 335545215)
+      INTEGER*4 GDS__bad_repl_handle                 
+      PARAMETER (GDS__bad_repl_handle                  = 335545216)
       INTEGER*4 GDS__gfix_db_name                    
       PARAMETER (GDS__gfix_db_name                     = 335740929)
       INTEGER*4 GDS__gfix_invalid_sw                 

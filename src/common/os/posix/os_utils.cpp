@@ -205,7 +205,7 @@ int openCreateSharedFile(const char* pathname, int flags)
 {
 	int fd = os_utils::open(pathname, flags | O_RDWR | O_CREAT, S_IREAD | S_IWRITE);
 	if (fd < 0)
-		raiseError(fd, pathname);
+		raiseError(ERRNO, pathname);
 
 	// Security check - avoid symbolic links in /tmp.
 	// Malicious user can create a symlink with this name pointing to say
@@ -218,9 +218,8 @@ int openCreateSharedFile(const char* pathname, int flags)
 
 	if (rc != 0)
 	{
-		int e = errno;
 		close(fd);
-		raiseError(e, pathname);
+		raiseError(ERRNO, pathname);
 	}
 
 	if (S_ISLNK(st.st_mode))

@@ -917,6 +917,7 @@ static const struct {
 	{"invalid_timezone_offset", 335545213},
 	{"invalid_timezone_region", 335545214},
 	{"invalid_timezone_id", 335545215},
+	{"bad_repl_handle", 335545216},
 	{"gfix_db_name", 335740929},
 	{"gfix_invalid_sw", 335740930},
 	{"gfix_incmp_sw", 335740932},

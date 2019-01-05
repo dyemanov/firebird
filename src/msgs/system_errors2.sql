@@ -902,6 +902,7 @@ set bulk_insert INSERT INTO SYSTEM_ERRORS (SQL_CODE, SQL_CLASS, SQL_SUBCLASS, FA
 (-901, '22', '009', 0, 893, 'invalid_timezone_offset', NULL, NULL)
 (-901, '22', '009', 0, 894, 'invalid_timezone_region', NULL, NULL)
 (-901, '22', '009', 0, 895, 'invalid_timezone_id', NULL, NULL)
+(-901, '08', '003', 0, 896, 'bad_repl_handle', NULL, NULL)
 -- GFIX
 (-901, '00', '000', 3, 1, 'gfix_db_name', NULL, NULL)
 (-901, '00', '000', 3, 2, 'gfix_invalid_sw', NULL, NULL)

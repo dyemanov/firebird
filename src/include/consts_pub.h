@@ -124,6 +124,7 @@
 #define isc_dpb_reset_icu				  89
 #define isc_dpb_map_attach                90
 #define isc_dpb_session_time_zone         91
+#define isc_dpb_set_db_replica            92
 
 /**************************************************/
 /* clumplet tags used inside isc_dpb_address_path */

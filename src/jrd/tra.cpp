@@ -70,6 +70,7 @@
 #include "../dsql/dsql.h"
 #include "../dsql/dsql_proto.h"
 #include "../common/StatusArg.h"
+#include "../jrd/replication/Publisher.h"
 #include "../jrd/trace/TraceManager.h"
 #include "../jrd/trace/TraceJrdHelpers.h"
 #include "../jrd/Function.h"
@@ -279,7 +280,7 @@ bool TRA_active_transactions(thread_db* tdbb, Database* dbb)
 	return LCK_query_data(tdbb, LCK_tra, LCK_ANY) ? true : false;
 }
 
-void TRA_cleanup(thread_db* tdbb)
+bool TRA_cleanup(thread_db* tdbb)
 {
 /**************************************
  *
@@ -301,7 +302,7 @@ void TRA_cleanup(thread_db* tdbb)
 
 	// Return without cleaning up the TIP's for a ReadOnly database
 	if (dbb->readOnly())
-		return;
+		return false;
 
 	// First, make damn sure there are no outstanding transactions
 
@@ -309,7 +310,7 @@ void TRA_cleanup(thread_db* tdbb)
 		 attachment = attachment->att_next)
 	{
 		if (attachment->att_transactions)
-			return;
+			return false;
 	}
 
 	const ULONG trans_per_tip = dbb->dbb_page_manager.transPerTIP;
@@ -325,7 +326,7 @@ void TRA_cleanup(thread_db* tdbb)
 	CCH_RELEASE(tdbb, &window);
 
 	if (ceiling == 0)
-		return;
+		return false;
 
 	// Zip thru transactions from the "oldest active" to the next looking for
 	// active transactions.  When one is found, declare it dead.
@@ -333,6 +334,7 @@ void TRA_cleanup(thread_db* tdbb)
 	const ULONG last = ceiling / trans_per_tip;
 	ULONG number = active % trans_per_tip;
 	TraNumber limbo = 0;
+	bool found = false;
 
 	for (ULONG sequence = active / trans_per_tip; sequence <= last; sequence++, number = 0)
 	{
@@ -351,6 +353,7 @@ void TRA_cleanup(thread_db* tdbb)
 				limbo = (TraNumber) sequence * trans_per_tip + number;
 			else if (state == tra_active)
 			{
+				found = true;
 				CCH_MARK(tdbb, &window);
 				*byte &= ~(TRA_MASK << shift);
 
@@ -411,6 +414,8 @@ void TRA_cleanup(thread_db* tdbb)
 
 	CCH_RELEASE(tdbb, &window);
 #endif
+
+	return found;
 }
 
 
@@ -491,9 +496,7 @@ void TRA_commit(thread_db* tdbb, jrd_tra* transaction, const bool retaining_flag
 		// Get rid of user savepoints to allow intermediate garbage collection
 		// in indices and BLOBs after in-place updates
 		while (transaction->tra_save_point)
-		{
 			transaction->rollforwardSavepoint(tdbb);
-		}
 
 		transaction_flush(tdbb, FLUSH_TRAN, transaction->tra_number);
 	}
@@ -517,6 +520,7 @@ void TRA_commit(thread_db* tdbb, jrd_tra* transaction, const bool retaining_flag
 	// Set the state on the inventory page to be committed
 
 	TRA_set_state(tdbb, transaction, transaction->tra_number, tra_committed);
+	REPL_trans_commit(tdbb, transaction);
 
 	// Perform any post commit work
 
@@ -1294,6 +1298,11 @@ void TRA_release_transaction(thread_db* tdbb, jrd_tra* transaction, Jrd::TraceTr
 
 	transaction->unlinkFromAttachment();
 
+	// Destroy the replicated transaction reference
+
+	if (transaction->tra_replicator)
+		transaction->tra_replicator->dispose();
+
 	// Release transaction's under-modification-rpb list
 
 	delete transaction->tra_rpblist;
@@ -1429,6 +1438,7 @@ void TRA_rollback(thread_db* tdbb, jrd_tra* transaction, const bool retaining_fl
 	}
 
 	TRA_set_state(tdbb, transaction, transaction->tra_number, state);
+	REPL_trans_rollback(tdbb, transaction);
 
 	TRA_release_transaction(tdbb, transaction, &trace);
 }
@@ -1964,6 +1974,7 @@ int TRA_wait(thread_db* tdbb, jrd_tra* trans, TraNumber number, jrd_tra::wait_t 
 	{
 		state = tra_dead;
 		TRA_set_state(tdbb, 0, number, tra_dead);
+		REPL_trans_cleanup(tdbb, number);
 	}
 
 	// If the transaction disappeared into limbo, died, for constructively
@@ -2537,6 +2548,11 @@ static void retain_context(thread_db* tdbb, jrd_tra* transaction, bool commit, i
 	{
 		// Set the state on the inventory page
 		TRA_set_state(tdbb, transaction, old_number, state);
+
+		if (commit)
+			REPL_trans_commit(tdbb, transaction);
+		else
+			REPL_trans_rollback(tdbb, transaction);
 	}
 	transaction->tra_number = new_number;
 
@@ -3205,6 +3221,11 @@ static void transaction_start(thread_db* tdbb, jrd_tra* trans)
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 	WIN window(DB_PAGE_SPACE, -1);
 
+	// Inside the replica, only replicator sessions are allowed to modify data.
+	// Fake other transactions as read-only to disallow any modifications.
+	if (dbb->isReplica(REPLICA_READ_ONLY) && !(tdbb->tdbb_flags & TDBB_replicator))
+		trans->tra_flags |= TRA_readonly;
+
 	Lock* lock = FB_NEW_RPT(*tdbb->getDefaultPool(), 0) Lock(tdbb, sizeof(TraNumber), LCK_tra);
 
 	// Read header page and allocate transaction number.  Since
@@ -3705,6 +3726,8 @@ void jrd_tra::rollbackSavepoint(thread_db* tdbb)
 {
 	if (tra_save_point && !(tra_flags & TRA_system))
 	{
+		REPL_save_cleanup(tdbb, this, tra_save_point, true);
+
 		Jrd::ContextPoolHolder context(tdbb, tra_pool);
 		tra_save_point = tra_save_point->rollback(tdbb);
 	}
@@ -3758,6 +3781,8 @@ void jrd_tra::rollforwardSavepoint(thread_db* tdbb)
 {
 	if (tra_save_point && !(tra_flags & TRA_system))
 	{
+		REPL_save_cleanup(tdbb, this, tra_save_point, false);
+
 		Jrd::ContextPoolHolder context(tdbb, tra_pool);
 		tra_save_point = tra_save_point->rollforward(tdbb);
 	}

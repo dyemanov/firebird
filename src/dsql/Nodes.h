@@ -264,6 +264,11 @@ public:
 	virtual void putErrorPrefix(Firebird::Arg::StatusVector& statusVector) = 0;
 
 	virtual void execute(thread_db* tdbb, DsqlCompilerScratch* dsqlScratch, jrd_tra* transaction) = 0;
+
+	virtual bool mustBeReplicated() const
+	{
+		return true;
+	}
 };
 
 
