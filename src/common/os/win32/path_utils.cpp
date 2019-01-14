@@ -89,7 +89,7 @@ const PathUtils::DirIterator& Win32DirIterator::operator++()
 				done = true;
 				break;
 			}
-			else if !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			else if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 				break;
 		}
 
