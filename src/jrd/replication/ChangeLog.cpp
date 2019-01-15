@@ -316,7 +316,7 @@ ChangeLog::ChangeLog(MemoryPool& pool,
 					 const PathName& database,
 					 const Guid& guid,
 					 const FB_UINT64 sequence,
-					 const Config* config)
+					 const Replication::Config* config)
 	: PermanentStorage(pool),
 	  m_database(pool, database), m_config(config),
 	  m_segments(pool), m_sequence(sequence), m_shutdown(false)

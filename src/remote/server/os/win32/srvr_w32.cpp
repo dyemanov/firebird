@@ -111,6 +111,7 @@
 #include "firebird/Interface.h"
 #include "../common/classes/ImplementHelper.h"
 #include "../common/os/os_utils.h"
+#include "../common/status.h"
 #include "../auth/trusted/AuthSspi.h"
 #include "../auth/SecurityDatabase/LegacyServer.h"
 #include "../auth/SecureRemotePassword/server/SrpServer.h"
