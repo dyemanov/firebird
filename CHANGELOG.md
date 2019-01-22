@@ -28,6 +28,10 @@
   Reference(s): [/doc/README.monitoring_tables](https://github.com/FirebirdSQL/firebird/raw/master/doc/README.monitoring_tables)  
   Contributor(s): Alex Peshkoff
 
+* [CORE-2022](http://tracker.firebirdsql.org/browse/CORE-2022): Built-in logical replication  
+  Reference(s): [/doc/README.replication.md](https://github.com/FirebirdSQL/firebird/raw/master/doc/README.replication.md)  
+  Contributor(s): Dmitry Yemanov
+
 * [CORE-909](http://tracker.firebirdsql.org/browse/CORE-909): Ability to retrieve current UTC/GMT timestamp  
   Reference(s): [/doc/sql.extentions/README.time_zone.md](https://github.com/FirebirdSQL/firebird/raw/master/doc/sql.extensions/README.time_zone.md)  
   Contributor(s): Adriano dos Santos Fernandes
