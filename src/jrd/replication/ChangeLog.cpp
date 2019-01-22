@@ -171,15 +171,8 @@ void ChangeLog::Segment::copyTo(const PathName& filename) const
 
 	const auto totalLength = m_header->hdr_length;
 	fb_assert(totalLength > sizeof(SegmentHeader));
-/*
-	const auto srcHandle = os_utils::open(m_filename.c_str(), O_RDONLY | O_BINARY);
 
-	if (srcHandle == -1)
-		raiseIOError("open", m_filename.c_str());
-
-	AutoFile srcFile(srcHandle);
-*/
-	const auto dstHandle = os_utils::openCreateSharedFile(filename.c_str(), O_EXCL | O_BINARY);
+	const auto dstHandle = os_utils::openCreateSharedFile(filename.c_str(), O_TRUNC | O_BINARY);
 
 	AutoFile dstFile(dstHandle);
 
@@ -330,13 +323,10 @@ ChangeLog::ChangeLog(MemoryPool& pool,
 
 	{ // scope
 		LockGuard guard(this);
-/*
- *	dimitr: If the server crashes while archiving, segments will remain in the ARCH state
- *			forever. The code underneath allows to recover their state and retry archiving them.
- *			However, it may cause errors if the crash happened after the archive destination has
- *			already been created -- the "already exists" case -- and pollute the log with errors
- *			while infinitely (and unsuccessfully) retrying to re-archive the segment. Sigh.
- *
+
+		// If the server crashes while archiving, segments may remain in the ARCH state forever.
+		// This code allows to recover their state and retry archiving them.
+
 		const auto state = m_state->getHeader();
 
 		if (!state->pidUpper)
@@ -345,13 +335,11 @@ ChangeLog::ChangeLog(MemoryPool& pool,
 
 			for (const auto segment : m_segments)
 			{
-				const auto segment = *iter;
-
 				if (segment->getState() == SEGMENT_STATE_ARCH)
 					segment->setState(SEGMENT_STATE_FULL);
 			}
 		}
-*/
+
 		linkSelf();
 	}
 
@@ -551,8 +539,13 @@ FB_UINT64 ChangeLog::write(ULONG length, const UCHAR* data, bool sync)
 
 	for (unsigned i = 0; i < NO_SPACE_RETRIES && !segment; i++)
 	{
-		const string warningMsg = "Out of available space in changelog segments, waiting for archiving...";
-		logOriginMessage(m_database, warningMsg, WARNING_MSG);
+		if (i == 0) // log the warning just once
+		{
+			const string warningMsg =
+				"Out of available space in changelog segments, waiting for archiving...";
+
+			logOriginMessage(m_database, warningMsg, WARNING_MSG);
+		}
 
 		{	// scope
 			LockCheckout checkout(this);
@@ -607,12 +600,12 @@ FB_UINT64 ChangeLog::write(ULONG length, const UCHAR* data, bool sync)
 	return state->sequence;
 }
 
-bool ChangeLog::archiveExecute(const Segment* segment)
+bool ChangeLog::archiveExecute(Segment* segment)
 {
-	LockCheckout checkout(this);
-
 	if (m_config->logArchiveCommand.hasData())
 	{
+		segment->truncate();
+
 		auto archiveCommand = m_config->logArchiveCommand;
 
 		const auto logfilename = segment->getFileName();
@@ -631,6 +624,8 @@ bool ChangeLog::archiveExecute(const Segment* segment)
 
 		while ( (pos = archiveCommand.find(ARCHPATHNAME_WILDCARD)) != string::npos)
 			archiveCommand.replace(pos, strlen(ARCHPATHNAME_WILDCARD), archpathname);
+
+		LockCheckout checkout(this);
 
 		fb_assert(archiveCommand.hasData());
 		const auto res = executeShell(archiveCommand);
@@ -659,8 +654,23 @@ bool ChangeLog::archiveExecute(const Segment* segment)
 		const auto logfilename = segment->getFileName();
 		const auto archpathname = m_config->logArchiveDirectory + logfilename;
 
+		struct stat statistics;
+		if (os_utils::stat(archpathname.c_str(), &statistics) == 0)
+		{
+			if (statistics.st_size > (int) sizeof(SegmentHeader))
+			{
+				string warningMsg;
+				warningMsg.printf("Destination log file %s exists, it will be overwritten",
+								  archpathname.c_str());
+
+				logOriginMessage(m_database, warningMsg, WARNING_MSG);
+			}
+		}
+
 		try
 		{
+			LockCheckout checkout(this);
+
 			segment->copyTo(archpathname);
 		}
 		catch (const status_exception& ex)
@@ -693,9 +703,6 @@ bool ChangeLog::archiveSegment(Segment* segment)
 {
 //	if (m_config->logArchiveCommand.hasData() || m_config->logArchiveDirectory.hasData())
 	{
-		if (m_config->logArchiveCommand.hasData())
-			segment->truncate();
-
 		segment->setState(SEGMENT_STATE_ARCH);
 		segment->addRef();
 

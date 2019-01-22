@@ -123,7 +123,6 @@ Config* Config::get(const PathName& lookupName)
 			raiseError("Unknown section found in the configuration file");
 
 		PathName dbName(section.value.c_str());
-		PathUtils::fixupSeparators(dbName);
 
 		if (dbName.empty())
 		{
@@ -132,10 +131,16 @@ Config* Config::get(const PathName& lookupName)
 
 			defaultFound = true;
 		}
-		else if (dbName == lookupName)
-			exactMatch = true;
 		else
-			continue;
+		{
+			PathUtils::fixupSeparators(dbName);
+			ISC_expand_filename(dbName, true);
+
+			if (dbName != lookupName)
+				continue;
+
+			exactMatch = true;
+		}
 
 		const ConfigFile::Parameters& elements = section.sub->getParameters();
 		for (const auto& el : elements)
@@ -245,7 +250,6 @@ void Config::enumerate(Firebird::Array<Config*>& replicas)
 			raiseError("Unknown section found in the configuration file");
 
 		PathName dbName(section.value.c_str());
-		PathUtils::fixupSeparators(dbName);
 
 		const ConfigFile::Parameters& elements = section.sub->getParameters();
 		for (const auto& el : elements)
@@ -279,6 +283,9 @@ void Config::enumerate(Firebird::Array<Config*>& replicas)
 		if (config->logSourceDirectory.hasData())
 		{
 			// If source_directory is specified, then replication is enabled
+
+			PathUtils::fixupSeparators(dbName);
+			ISC_expand_filename(dbName, true);
 
 			config->dbName = dbName;
 			replicas.add(config.release());

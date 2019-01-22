@@ -10,7 +10,7 @@ There are two replication modes available: synchronous and asynchronous.
 
 In synchronous replication, the primary database is permanently connected to the replica database\(s\) and changes are being replicated immediately \(in fact, some recent uncommitted changes may be buffered, but they are transmitted at the commit time\). This effectively means that databases are in sync after every commit. However, this may impact performance due to additional network traffic and round-trips. Multiple synchronous replicas can be configured, if necessary.
 
-In asynchronous replication, changes are being written into the local journal files thatare transferred over the wire and applied to the replica database. This impacts the performance much less, but introduces the delay \(known as replication lag\) when changes are not yet applied to the replica database, i.e. the replica database is always "catching up" the master database.
+In asynchronous replication, changes are being written into the local journal files that are transferred over the wire and applied to the replica database. This impacts the performance much less, but introduces the delay \(known as replication lag\) when changes are not yet applied to the replica database, i.e. the replica database is always "catching up" the master database.
 
 There are two access modes for replica databases: read-only and read-write. Read-only replica allows to execute any query that does not modify data \(global temporary tables can be modified as they are not replicated\), modifications are limited to the replication process only. Read-write replica allows to execute any query, possible conflicts must be resolved by users.
 
@@ -34,7 +34,7 @@ Tables to be replicated can be customized using two settings: include\_filter an
 
 Synchronous replication can be turned on using the sync\_replica setting \(multiple entries are allowed\). It must specify a connection string to the replica database, prefixed with username/password. In SuperServer and SuperClassic architectures, replica database is being internally attached when the first user gets connected to the master database and detached when the last user disconnects from the master database. In Classic Server architecture, every server process keeps an active connection to the replica database.
 
-Asynchronous replication requires setting up the journalling mechanism.The primary parameter is log\_directory which defines location of the replication journal. Once this location is specified, asynchronous replication is turned on and Firebird server starts producing.the journal segments.
+Asynchronous replication requires setting up the journalling mechanism.The primary parameter is log\_directory which defines location of the replication journal. Once this location is specified, asynchronous replication is turned on and Firebird server starts producing the journal segments.
 
 Minimal configuration looks like this:
 
@@ -71,6 +71,8 @@ database = /data/mydb.fdb
 
 Read replication.conf for other possible settings.
 
+To apply the changed master-side settings, all users must be reconnected.
+
 ## Setting up the replica side
 
 The same replication.conf file is used. Setting log\_source\_directory specifies the location that Firebird server scans for the transmitted segments. Additionally, DBA may explicitly specify what source database is accepted for replication. Setting source\_guid is used for that purpose.
@@ -84,6 +86,8 @@ database = /data/mydb.fdb
 }
 
 Read replication.conf for other possible settings.
+
+To apply the changed replica-side settings, Firebird server must be restarted.
 
 ## Creating the replica database
 

@@ -225,7 +225,7 @@ namespace Replication
 		Segment* reuseSegment(Segment* segment);
 		Segment* getSegment(ULONG segment);
 
-		bool archiveExecute(const Segment*);
+		bool archiveExecute(Segment*);
 		bool archiveSegment(Segment*);
 
 		void switchActiveSegment();
