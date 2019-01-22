@@ -78,8 +78,8 @@ namespace Firebird {
 
 template<class SHA>void get_digest(const unsigned char* message, size_t len, unsigned char* digest)
 {
-    SHA sha;
-    sha.process(len, message);
+	SHA sha;
+	sha.process(len, message);
 	sha.getHash(digest);
 }
 
@@ -113,9 +113,11 @@ template<class SHA> void hashBased64(Firebird::string& hash, const Firebird::str
  * by calling the "reset" method.
  */
 
-class sha2_base : public GlobalStorage {
+class sha2_base : public GlobalStorage
+{
 #else
-class sha2_base {
+class sha2_base
+{
 #endif
 public:
 	sha2_base() {}
@@ -163,7 +165,8 @@ public:
 #endif
 };
 
-class sha256 : public sha2_base {
+class sha256 : public sha2_base
+{
 public:
 	sha256();
 	const unsigned int get_DigestSize() { return SHA256_DIGEST_SIZE; }
@@ -180,22 +183,23 @@ protected:
 private:
 	void sha256_init(sha256_ctx* ctx);
 	void sha256_update(sha256_ctx* ctx, const unsigned char* message,
-                   unsigned int len);
+		unsigned int len);
 	void sha256_final(sha256_ctx* ctx, unsigned char* digest);
 
 protected:
 	sha256_ctx ctx;
 
 	void sha256_transf(sha256_ctx* ctx, const unsigned char* message,
-                   unsigned int block_nb);
+		unsigned int block_nb);
 	void sha_init() { sha256_init(&ctx); }
 	void sha_update(const unsigned char* message, unsigned int len) { sha256_update(&ctx,message,len); }
 	void sha_final(unsigned char* digest) { sha256_final(&ctx,digest); }
 };
 
-class sha224 : public sha256 {
+class sha224 : public sha256
+{
 public:
-    sha224();
+	sha224();
 	const unsigned int get_DigestSize() { return SHA224_DIGEST_SIZE; }
 	const unsigned int get_BlockSize() { return SHA224_BLOCK_SIZE; }
 
@@ -203,7 +207,7 @@ private:
 	typedef sha256_ctx sha224_ctx;
 	void sha224_init(sha224_ctx* ctx);
 	void sha224_update(sha224_ctx* ctx, const unsigned char* message,
-                   unsigned int len);
+		unsigned int len);
 	void sha224_final(sha224_ctx* ctx, unsigned char* digest);
 
 protected:
@@ -212,7 +216,8 @@ protected:
 	void sha_final(unsigned char* digest) { sha224_final(&ctx,digest); }
 };
 
-class sha512 : public sha2_base {
+class sha512 : public sha2_base
+{
 public:
 	sha512();
 	const unsigned int get_DigestSize() { return SHA512_DIGEST_SIZE; }
@@ -229,20 +234,21 @@ protected:
 private:
 	void sha512_init(sha512_ctx* ctx);
 	void sha512_update(sha512_ctx* ctx, const unsigned char* message,
-                   unsigned int len);
+		unsigned int len);
 	void sha512_final(sha512_ctx* ctx, unsigned char* digest);
 protected:
 
 	sha512_ctx ctx;
 
 	void sha512_transf(sha512_ctx* ctx, const unsigned char* message,
-                   unsigned int block_nb);
+		unsigned int block_nb);
 	void sha_init() { sha512_init(&ctx); }
 	void sha_update(const unsigned char* message, unsigned int len) { sha512_update(&ctx, message, len); }
 	void sha_final(unsigned char* digest) { sha512_final(&ctx, digest); }
 };
 
-class sha384 : public sha512 {
+class sha384 : public sha512
+{
 public:
 	sha384();
 	const unsigned int get_DigestSize() { return SHA384_DIGEST_SIZE; }
@@ -252,7 +258,7 @@ private:
 	typedef sha512_ctx sha384_ctx;
 	void sha384_init(sha384_ctx* ctx);
 	void sha384_update(sha384_ctx* ctx, const unsigned char* message,
-                   unsigned int len);
+		unsigned int len);
 	void sha384_final(sha384_ctx* ctx, unsigned char* digest);
 
 protected:

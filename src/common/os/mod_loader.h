@@ -110,12 +110,14 @@ public:
 	static Module* fixAndLoadModule(ISC_STATUS* status, const Firebird::PathName& modName)
 	{
 		Module* mod = loadModule(NULL, modName);
+
 		if (!mod)
 		{
 			Firebird::PathName fixed(modName);
 			doctorModuleExtension(fixed);
 			mod = loadModule(status, fixed);
 		}
+
 		return mod;
 	}
 

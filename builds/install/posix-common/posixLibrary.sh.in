@@ -221,7 +221,9 @@ checkLibrary() {
 checkLibraries() {
 	if [ "@TOMMATH_BUILD@" != "Y" ]
 	then
+		fixTommath=
 		checkLibrary tommath
+		haveLibrary libtommath.so.0 || [ "$fixTommath" ] && $fixTommath
 	fi
 
 	if [ "@TOMCRYPT_BUILD@" != "Y" ]

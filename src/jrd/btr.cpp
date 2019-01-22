@@ -587,6 +587,7 @@ DSC* BTR_eval_expression(thread_db* tdbb, index_desc* idx, Record* record, bool&
 
 		expr_request->req_caller = NULL;
 		expr_request->req_flags &= ~req_in_use;
+		expr_request->req_attachment = NULL;
 		expr_request->req_gmt_timestamp.invalidate();
 
 		throw;
@@ -597,6 +598,7 @@ DSC* BTR_eval_expression(thread_db* tdbb, index_desc* idx, Record* record, bool&
 
 	expr_request->req_caller = NULL;
 	expr_request->req_flags &= ~req_in_use;
+	expr_request->req_attachment = NULL;
 	expr_request->req_gmt_timestamp.invalidate();
 
 	return result;

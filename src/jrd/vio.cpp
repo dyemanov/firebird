@@ -4756,6 +4756,8 @@ void Database::garbage_collector(Database* dbb)
 			PAG_attachment_id(tdbb);
 			TRA_init(attachment);
 
+			Monitoring::publishAttachment(tdbb);
+
 			dbb->dbb_garbage_collector = gc;
 
 			sAtt->initDone();

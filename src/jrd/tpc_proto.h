@@ -294,7 +294,7 @@ private:
 inline int TPC_cache_state(thread_db* tdbb, TraNumber number)
 {
 	CommitNumber stateCn = tdbb->getDatabase()->dbb_tip_cache->cacheState(number);
-	switch(stateCn)
+	switch (stateCn)
 	{
 	case CN_ACTIVE:	return tra_active;
 	case CN_LIMBO:	return tra_limbo;

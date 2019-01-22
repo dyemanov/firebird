@@ -1101,8 +1101,7 @@ namespace {
 }
 static VdnResult	verifyDatabaseName(const PathName&, FbStatusVector*, bool);
 
-static void		unwindAttach(thread_db* tdbb, const Exception& ex, FbStatusVector* userStatus,
-	Jrd::Attachment* attachment, Database* dbb, bool internalFlag);
+static void		unwindAttach(thread_db* tdbb, const Exception& ex, FbStatusVector* userStatus, bool internalFlag);
 static JAttachment*	initAttachment(thread_db*, const PathName&, const PathName&, RefPtr<const Config>, bool,
 	const DatabaseOptions&, RefMutexUnlock&, IPluginConfig*, JProvider*);
 static JAttachment*	create_attachment(const PathName&, Database*, const DatabaseOptions&, bool newDb);
@@ -1740,6 +1739,8 @@ JAttachment* JProvider::internalAttach(CheckStatusWrapper* user_status, const ch
 			userId.makeRoleName(options.dpb_sql_dialect);
 			UserId::sclInit(tdbb, false, userId);
 
+			Monitoring::publishAttachment(tdbb);
+
 			// This pair (SHUT_database/SHUT_online) checks itself for valid user name
 			if (options.dpb_shutdown)
 				SHUT_database(tdbb, options.dpb_shutdown, options.dpb_shutdown_delay, NULL);
@@ -2038,7 +2039,7 @@ JAttachment* JProvider::internalAttach(CheckStatusWrapper* user_status, const ch
 			}
 
 			mapping.clearMainHandle();
-			unwindAttach(tdbb, ex, user_status, attachment, dbb, existingId);
+			unwindAttach(tdbb, ex, user_status, existingId);
 		}
 	}
 	catch (const Exception& ex)
@@ -2876,6 +2877,8 @@ JAttachment* JProvider::createDatabase(CheckStatusWrapper* user_status, const ch
 
 			PAG_attachment_id(tdbb);
 
+			Monitoring::publishAttachment(tdbb);
+
 			CCH_release_exclusive(tdbb);
 
 			// Figure out what character set & collation this attachment prefers
@@ -2925,7 +2928,7 @@ JAttachment* JProvider::createDatabase(CheckStatusWrapper* user_status, const ch
 				filename, options, true, user_status);
 
 			mapping.clearMainHandle();
-			unwindAttach(tdbb, ex, user_status, attachment, dbb, false);
+			unwindAttach(tdbb, ex, user_status, false);
 		}
 	}
 	catch (const Exception& ex)
@@ -8134,8 +8137,7 @@ static void getUserInfo(UserId& user, const DatabaseOptions& options, const char
 	}
 }
 
-static void unwindAttach(thread_db* tdbb, const Exception& ex, FbStatusVector* userStatus,
-	Jrd::Attachment* attachment, Database* dbb, bool internalFlag)
+static void unwindAttach(thread_db* tdbb, const Exception& ex, FbStatusVector* userStatus, bool internalFlag)
 {
 	RefDeb(DEB_RLS_JATT, "unwindAttach");
 	RefDeb(DEB_AR_JATT, "unwindAttach");
@@ -8143,10 +8145,14 @@ static void unwindAttach(thread_db* tdbb, const Exception& ex, FbStatusVector* u
 
 	try
 	{
+		const auto dbb = tdbb->getDatabase();
+
 		if (dbb)
 		{
 			fb_assert(!dbb->locked());
 			ThreadStatusGuard temp_status(tdbb);
+
+			const auto attachment = tdbb->getAttachment();
 
 			if (attachment)
 			{

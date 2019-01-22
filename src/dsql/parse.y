@@ -448,6 +448,8 @@ using namespace Firebird;
 %token <metaNamePtr> ASIN
 %token <metaNamePtr> ATAN
 %token <metaNamePtr> ATAN2
+%token <metaNamePtr> BASE64_DECODE
+%token <metaNamePtr> BASE64_ENCODE
 %token <metaNamePtr> BIN_AND
 %token <metaNamePtr> BIN_OR
 %token <metaNamePtr> BIN_SHL
@@ -458,6 +460,7 @@ using namespace Firebird;
 %token <metaNamePtr> COS
 %token <metaNamePtr> COSH
 %token <metaNamePtr> COT
+%token <metaNamePtr> CRC32
 %token <metaNamePtr> DATEADD
 %token <metaNamePtr> DATEDIFF
 %token <metaNamePtr> DECODE
@@ -595,19 +598,20 @@ using namespace Firebird;
 %token <metaNamePtr> BINARY
 %token <metaNamePtr> BIND
 %token <metaNamePtr> COMPARE_DECFLOAT
-%token <metaNamePtr> CUME_DIST
+%token <metaNamePtr> CONSISTENCY
 %token <metaNamePtr> COUNTER
 %token <metaNamePtr> CTR_BIG_ENDIAN
 %token <metaNamePtr> CTR_LENGTH
 %token <metaNamePtr> CTR_LITTLE_ENDIAN
+%token <metaNamePtr> CUME_DIST
 %token <metaNamePtr> DECFLOAT
 %token <metaNamePtr> DEFINER
 %token <metaNamePtr> EXCLUDE
 %token <metaNamePtr> FIRST_DAY
 %token <metaNamePtr> FOLLOWING
 %token <metaNamePtr> IDLE
-%token <metaNamePtr> IV
 %token <metaNamePtr> INVOKER
+%token <metaNamePtr> IV
 %token <metaNamePtr> LAST_DAY
 %token <metaNamePtr> LEGACY
 %token <metaNamePtr> LOCAL
@@ -627,6 +631,7 @@ using namespace Firebird;
 %token <metaNamePtr> QUANTIZE
 %token <metaNamePtr> RANGE
 %token <metaNamePtr> RDB_ERROR
+%token <metaNamePtr> RDB_GET_TRANSACTION_CN
 %token <metaNamePtr> RDB_ROLE_IN_USE
 %token <metaNamePtr> RDB_SYSTEM_PRIVILEGE
 %token <metaNamePtr> RESET
@@ -637,9 +642,9 @@ using namespace Firebird;
 %token <metaNamePtr> RSA_SIGN
 %token <metaNamePtr> RSA_VERIFY
 %token <metaNamePtr> SALT_LENGTH
-%token <metaNamePtr> SIGNATURE
 %token <metaNamePtr> SECURITY
 %token <metaNamePtr> SESSION
+%token <metaNamePtr> SIGNATURE
 %token <metaNamePtr> SQL
 %token <metaNamePtr> SYSTEM
 %token <metaNamePtr> TIES
@@ -652,8 +657,6 @@ using namespace Firebird;
 %token <metaNamePtr> WINDOW
 %token <metaNamePtr> WITHOUT
 %token <metaNamePtr> ZONE
-%token <metaNamePtr> CONSISTENCY
-%token <metaNamePtr> RDB_GET_TRANSACTION_CN
 
 // external connections pool management
 %token <metaNamePtr> CONNECTIONS
@@ -5239,7 +5242,7 @@ set_decfloat_traps
 set_decfloat_bind
 	: SET DECFLOAT BIND
 			{ $$ = newNode<SetDecFloatBindNode>(); }
-		bind_clause($4)
+		decfloat_bind_clause($4)
 			{ $$ = $4; }
 	;
 
@@ -5261,8 +5264,8 @@ decfloat_trap($setDecFloatTrapsNode)
 		{ $setDecFloatTrapsNode->trap($1); }
 	;
 
-%type bind_clause(<setDecFloatBindNode>)
-bind_clause($setDecFloatBindNode)
+%type decfloat_bind_clause(<setDecFloatBindNode>)
+decfloat_bind_clause($setDecFloatBindNode)
 	: NATIVE
 		// do nothing
 	| character_keyword
@@ -6674,13 +6677,13 @@ boolean_value_expression
 		{ $$ = $2; }
 	| value IS boolean_literal
 		{
-			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_eql, $1, $3);
+			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_equiv, $1, $3);
 			node->dsqlCheckBoolean = true;
 			$$ = node;
 		}
 	| value IS NOT boolean_literal
 		{
-			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_eql, $1, $4);
+			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_equiv, $1, $4);
 			node->dsqlCheckBoolean = true;
 			$$ = newNode<NotBoolNode>(node);
 		}
@@ -7177,7 +7180,7 @@ value_special
 %type <valueExprNode> value_primary
 value_primary
 	: nonparenthesized_value
-	| '(' value_primary ')'							{ $$ = $2; }
+	| '(' value_primary ')'				{ $$ = $2; }
 	;
 
 // Matches definition of <simple value specification> in SQL standard
@@ -7881,6 +7884,8 @@ system_function_std_syntax
 	| ATAN
 	| ATAN2
 	| ATANH
+	| BASE64_DECODE
+	| BASE64_ENCODE
 	| BIN_AND
 	| BIN_NOT
 	| BIN_OR
@@ -7892,6 +7897,7 @@ system_function_std_syntax
 	| COS
 	| COSH
 	| COT
+	| CRC32
 	| EXP
 	| FLOOR
 	| GEN_UUID
@@ -8761,11 +8767,18 @@ non_reserved_word
 	| SERVERWIDE
 	| INCREMENT
 	| TRUSTED
-	| BIND					// added in FB 4.0
+	| BASE64_DECODE		// added in FB 4.0
+	| BASE64_ENCODE
+	| BIND
 	| CLEAR
+	| COUNTER
 	| COMPARE_DECFLOAT
 	| CONNECTIONS
 	| CONSISTENCY
+	| CRC32
+	| CTR_BIG_ENDIAN
+	| CTR_LENGTH
+	| CTR_LITTLE_ENDIAN
 	| CUME_DIST
 	| DEFINER
 	| EXCLUDE
@@ -8773,10 +8786,13 @@ non_reserved_word
 	| FOLLOWING
 	| IDLE
 	| INVOKER
+	| IV
 	| LAST_DAY
 	| LEGACY
 	| LIFETIME
+	| LPARAM
 	| MESSAGE
+	| MODE
 	| NATIVE
 	| NORMALIZE_DECFLOAT
 	| NTILE
@@ -8790,21 +8806,6 @@ non_reserved_word
 	| QUANTIZE
 	| RANGE
 	| RESET
-	| SECURITY
-	| SESSION
-	| SQL
-	| SYSTEM
-	| TIES
-	| TOTALORDER
-	| TRAPS
-	| ZONE
-	| MODE				// crypt functions
-	| IV
-	| COUNTER
-	| CTR_BIG_ENDIAN
-	| CTR_LITTLE_ENDIAN
-	| CTR_LENGTH
-	| LPARAM
 	| RSA_DECRYPT
 	| RSA_ENCRYPT
 	| RSA_PRIVATE
@@ -8812,7 +8813,15 @@ non_reserved_word
 	| RSA_SIGN
 	| RSA_VERIFY
 	| SALT_LENGTH
+	| SECURITY
+	| SESSION
 	| SIGNATURE
+	| SQL
+	| SYSTEM
+	| TIES
+	| TOTALORDER
+	| TRAPS
+	| ZONE
 	;
 
 %%

@@ -8737,13 +8737,11 @@ ClntAuthBlock::ClntAuthBlock(const Firebird::PathName* fileName, Firebird::Clump
 	if (dpb && tags)
 	{
 		if (dpb->find(tags->config_text))
-		{
 			dpb->getString(dpbConfig);
-		}
+
 		if (dpb->find(tags->plugin_list))
-		{
 			dpb->getPath(dpbPlugins);
-		}
+
 		if (dpb->find(tags->auth_block))
 		{
 			AuthReader::AuthBlock plain;
@@ -8774,10 +8772,10 @@ void ClntAuthBlock::extractDataFromPluginTo(Firebird::ClumpletWriter& dpb,
 		if (firstTime)
 		{
 			fb_assert(tags->plugin_name && tags->plugin_list);
+
 			if (pluginName.hasData())
-			{
 				dpb.insertPath(tags->plugin_name, pluginName);
-			}
+
 			dpb.deleteWithTag(tags->plugin_list);
 			dpb.insertPath(tags->plugin_list, pluginList);
 			firstTime = false;

@@ -103,6 +103,7 @@ ModuleLoader::Module* ModuleLoader::loadModule(ISC_STATUS* status, const Firebir
 			status[3] = (ISC_STATUS) dlerror();
 			status[4] = isc_arg_end;
 		}
+
 		return 0;
 	}
 

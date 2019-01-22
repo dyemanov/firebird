@@ -344,6 +344,20 @@ int RESTORE_restore (const TEXT* file_name, const TEXT* database_name)
 		}
 	END_ERROR;
 
+	if (tdgbl->global_trans)
+	{
+		BURP_verbose (68);
+		// msg 68 committing meta data
+		EXEC SQL COMMIT TRANSACTION tdgbl->global_trans;
+		if (gds_status->hasData())
+			general_on_error ();
+		// Check to see if there is a warning
+		if (gds_status->getState() & Firebird::IStatus::STATE_WARNINGS)
+		{
+			BURP_print_warning(gds_status);
+		}
+	}
+
 	// Activate the indices for foreign keys and do another commit
 	if (!tdgbl->gbl_sw_deactivate_indexes)
 	{
@@ -465,20 +479,6 @@ int RESTORE_restore (const TEXT* file_name, const TEXT* database_name)
 		ON_ERROR
 			general_on_error ();
 		END_ERROR;
-	}
-
-	if (tdgbl->global_trans)
-	{
-		BURP_verbose (68);
-		// msg 68 committing meta data
-		EXEC SQL COMMIT TRANSACTION tdgbl->global_trans;
-		if (gds_status->hasData())
-			general_on_error ();
-		// Check to see if there is a warning
-		if (gds_status->getState() & Firebird::IStatus::STATE_WARNINGS)
-		{
-			BURP_print_warning(gds_status);
-		}
 	}
 
 	EXEC SQL SET TRANSACTION ISOLATION LEVEL READ COMMITTED NO_AUTO_UNDO;
@@ -7037,9 +7037,10 @@ bool get_index(BurpGlobals* tdgbl, const burp_rel* relation)
  *
  **************************************/
 	BASED_ON RDB$INDICES.RDB$INDEX_NAME index_name;
-	att_type	attribute;
-	bool		foreign_index = false;
-	scan_attr_t		scan_next_attr;
+	att_type attribute;
+	bool foreign_index = false;
+	bool expr_index = false;
+	scan_attr_t scan_next_attr;
 
 	SSHORT count = 0, segments = 0;
 
@@ -7089,7 +7090,7 @@ bool get_index(BurpGlobals* tdgbl, const burp_rel* relation)
 				}
 				else
 				{
-					if (!X.RDB$INDEX_INACTIVE && foreign_index)
+					if (!X.RDB$INDEX_INACTIVE && (foreign_index || expr_index))
 						X.RDB$INDEX_INACTIVE = DEFERRED_ACTIVE;
 				}
 				if (tdgbl->gbl_sw_deactivate_indexes)
@@ -7129,6 +7130,12 @@ bool get_index(BurpGlobals* tdgbl, const burp_rel* relation)
 				break;
 
 			case att_index_expression_blr:
+				expr_index = true;
+				// Defer expression index activation
+				if (!X.RDB$INDEX_INACTIVE)
+					X.RDB$INDEX_INACTIVE = DEFERRED_ACTIVE;
+				if (tdgbl->gbl_sw_deactivate_indexes)
+					X.RDB$INDEX_INACTIVE = TRUE;
 				X.RDB$EXPRESSION_BLR.NULL = FALSE;
 				get_blr_blob (tdgbl, X.RDB$EXPRESSION_BLR, false);
 				break;
@@ -11317,6 +11324,7 @@ void update_global_field(BurpGlobals* tdgbl)
 		ON_ERROR
 			general_on_error ();
 		END_ERROR;
+
 		gfld* n_gfield = gfield->gfld_next;
 		BURP_free (gfield);
 		gfield = n_gfield;

@@ -2496,6 +2496,8 @@ SLONG MET_lookup_index_name(thread_db* tdbb,
 	{
 		if (X.RDB$INDEX_INACTIVE == 0)
 			*status = MET_object_active;
+		else if (X.RDB$INDEX_INACTIVE == 3)
+			*status = MET_object_deferred_active;
 		else
 			*status = MET_object_inactive;
 

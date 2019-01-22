@@ -2906,7 +2906,8 @@ void rem_port::disconnect(PACKET* sendL, PACKET* receiveL)
 		}
 
 		rdb->rdb_iface->detach(&status_vector);
-		{
+
+		{	// scope
 			RefMutexGuard portGuard(*port_cancel_sync, FB_FUNCTION);
 			rdb->rdb_iface = NULL;
 		}
@@ -2993,11 +2994,13 @@ void rem_port::drop_database(P_RLSE* /*release*/, PACKET* sendL)
 		return;
 	}
 
-	{
+	{	// scope
 		RefMutexGuard portGuard(*port_cancel_sync, FB_FUNCTION);
 		rdb->rdb_iface = NULL;
 	}
+
 	port_flags |= PORT_detached;
+
 	if (port_async)
 		port_async->port_flags |= PORT_detached;
 
@@ -3087,7 +3090,7 @@ ISC_STATUS rem_port::end_database(P_RLSE* /*release*/, PACKET* sendL)
 			release_event(rdb->rdb_events);
 	}
 
-	{
+	{	// scope
 		RefMutexGuard portGuard(*port_cancel_sync, FB_FUNCTION);
 		rdb->rdb_iface = NULL;
 	}
@@ -6663,6 +6666,7 @@ bool Worker::wait(int timeout)
 	remove();
 	m_going = true;
 	m_cntGoing++;
+
 	return false;
 }
 

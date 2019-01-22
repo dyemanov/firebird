@@ -1444,8 +1444,10 @@ double CVT_get_double(const dsc* desc, DecimalStatus decSt, ErrorFunction err, b
 		return value;
 
 	case dtype_timestamp:
+	case dtype_timestamp_tz:
 	case dtype_sql_date:
 	case dtype_sql_time:
+	case dtype_sql_time_tz:
 	case dtype_blob:
 	case dtype_array:
 	case dtype_dbkey:

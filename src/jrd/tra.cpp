@@ -3828,11 +3828,15 @@ void jrd_tra::checkBlob(thread_db* tdbb, const bid* blob_id, jrd_fld* fld, bool 
 					ThreadStatusGuard status_vector(tdbb);
 
 					if (fld)
+					{
 						SCL_check_access(tdbb, s_class, 0, 0, NULL, SCL_select, SCL_object_column,
 							false, fld->fld_name, blb_relation->rel_name);
+					}
 					else
+					{
 						SCL_check_access(tdbb, s_class, 0, 0, NULL, SCL_select, SCL_object_table,
 							false, blb_relation->rel_name);
+					}
 
 					s_class->scl_blb_access = SecurityClass::BA_SUCCESS;
 				}
@@ -3858,9 +3862,11 @@ void jrd_tra::checkBlob(thread_db* tdbb, const bid* blob_id, jrd_fld* fld, bool 
 			case SecurityClass::BA_FAILURE:
 				// Relation has been checked earlier and check was failed
 				if (punt)
+				{
 					ERR_post(Arg::Gds(isc_no_priv) << Arg::Str("SELECT") <<
 						(fld ? Arg::Str("COLUMN") : Arg::Str("TABLE")) <<
 						(fld ? Arg::Str(fld->fld_name) : Arg::Str(blb_relation->rel_name)));
+				}
 				else
 					tra_fetched_blobs.add(*blob_id);
 				break;

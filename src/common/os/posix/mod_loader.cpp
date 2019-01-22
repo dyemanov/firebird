@@ -75,18 +75,19 @@ void ModuleLoader::doctorModuleExtension(Firebird::PathName& name)
 		return;
 
 	Firebird::PathName::size_type pos = name.rfind("." SHRLIB_EXT);
+
 	if (pos != name.length() - 3)
 	{
 		pos = name.rfind("." SHRLIB_EXT ".");
 		if (pos == Firebird::PathName::npos)
 			name += "." SHRLIB_EXT;
 	}
+
 	pos = name.rfind('/');
 	pos = (pos == Firebird::PathName::npos) ? 0 : pos + 1;
+
 	if (name.find("lib", pos) != pos)
-	{
 		name.insert(pos, "lib");
-	}
 }
 
 #ifdef DEV_BUILD
@@ -108,6 +109,7 @@ ModuleLoader::Module* ModuleLoader::loadModule(ISC_STATUS* status, const Firebir
 			status[3] = (ISC_STATUS) dlerror();
 			status[4] = isc_arg_end;
 		}
+
 		return 0;
 	}
 

@@ -10467,12 +10467,14 @@ void MappingNode::addItem(string& ddl, const char* text, char quote)
 {
 	ddl += quote;
 	char c;
+
 	while ((c = *text++))
 	{
 		ddl += c;
 		if (c == quote)
 			ddl += c;
 	}
+
 	ddl += quote;
 }
 
@@ -11414,7 +11416,7 @@ static bool checkObjectExist(thread_db* tdbb, jrd_tra* transaction, const MetaNa
 				X IN RDB$RELATIONS
 				WITH X.RDB$RELATION_NAME EQ name.c_str()
 			{
-				rc =  (type != obj_view) || (X.RDB$RELATION_TYPE == rel_view);
+				rc = (type != obj_view) || !X.RDB$VIEW_BLR.NULL;
 			}
 			END_FOR
 			break;

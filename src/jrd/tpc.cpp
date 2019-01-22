@@ -563,7 +563,7 @@ CommitNumber TipCache::snapshotState(thread_db* tdbb, TraNumber number)
 	//    (they were probably not causing much harm, but consistency is a good thing)
 	// 2. Old TPC returned tra_active for transactions in limbo, which was not correct
 	//
-	// hvlad: tra_active is correct here as it allows caller to wait for prepared but 
+	// hvlad: tra_active is correct here as it allows caller to wait for prepared but
 	// still active transaction
 	Lock temp_lock(tdbb, sizeof(TraNumber), LCK_tra);
 	temp_lock.setKey(number);

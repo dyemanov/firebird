@@ -951,7 +951,42 @@ const ISC_STATUS isc_file_starting_page_err           = 335545212L;
 const ISC_STATUS isc_invalid_timezone_offset          = 335545213L;
 const ISC_STATUS isc_invalid_timezone_region          = 335545214L;
 const ISC_STATUS isc_invalid_timezone_id              = 335545215L;
-const ISC_STATUS isc_bad_repl_handle                  = 335545216L;
+const ISC_STATUS isc_tom_decode64len                  = 335545216L;
+const ISC_STATUS isc_tom_strblob                      = 335545217L;
+const ISC_STATUS isc_tom_reg                          = 335545218L;
+const ISC_STATUS isc_tom_algorithm                    = 335545219L;
+const ISC_STATUS isc_tom_mode_miss                    = 335545220L;
+const ISC_STATUS isc_tom_mode_bad                     = 335545221L;
+const ISC_STATUS isc_tom_no_mode                      = 335545222L;
+const ISC_STATUS isc_tom_iv_miss                      = 335545223L;
+const ISC_STATUS isc_tom_no_iv                        = 335545224L;
+const ISC_STATUS isc_tom_ctrtype_bad                  = 335545225L;
+const ISC_STATUS isc_tom_no_ctrtype                   = 335545226L;
+const ISC_STATUS isc_tom_ctr_big                      = 335545227L;
+const ISC_STATUS isc_tom_no_ctr                       = 335545228L;
+const ISC_STATUS isc_tom_iv_length                    = 335545229L;
+const ISC_STATUS isc_tom_error                        = 335545230L;
+const ISC_STATUS isc_tom_yarrow_start                 = 335545231L;
+const ISC_STATUS isc_tom_yarrow_setup                 = 335545232L;
+const ISC_STATUS isc_tom_init_mode                    = 335545233L;
+const ISC_STATUS isc_tom_crypt_mode                   = 335545234L;
+const ISC_STATUS isc_tom_decrypt_mode                 = 335545235L;
+const ISC_STATUS isc_tom_init_cip                     = 335545236L;
+const ISC_STATUS isc_tom_crypt_cip                    = 335545237L;
+const ISC_STATUS isc_tom_decrypt_cip                  = 335545238L;
+const ISC_STATUS isc_tom_setup_cip                    = 335545239L;
+const ISC_STATUS isc_tom_setup_chacha                 = 335545240L;
+const ISC_STATUS isc_tom_encode                       = 335545241L;
+const ISC_STATUS isc_tom_decode                       = 335545242L;
+const ISC_STATUS isc_tom_rsa_import                   = 335545243L;
+const ISC_STATUS isc_tom_oaep                         = 335545244L;
+const ISC_STATUS isc_tom_hash_bad                     = 335545245L;
+const ISC_STATUS isc_tom_rsa_make                     = 335545246L;
+const ISC_STATUS isc_tom_rsa_export                   = 335545247L;
+const ISC_STATUS isc_tom_rsa_sign                     = 335545248L;
+const ISC_STATUS isc_tom_rsa_verify                   = 335545249L;
+const ISC_STATUS isc_tom_chacha_key                   = 335545250L;
+const ISC_STATUS isc_bad_repl_handle                  = 335545251L;
 const ISC_STATUS isc_gfix_db_name                     = 335740929L;
 const ISC_STATUS isc_gfix_invalid_sw                  = 335740930L;
 const ISC_STATUS isc_gfix_incmp_sw                    = 335740932L;
@@ -1426,7 +1461,7 @@ const ISC_STATUS isc_trace_switch_user_only           = 337182757L;
 const ISC_STATUS isc_trace_switch_param_miss          = 337182758L;
 const ISC_STATUS isc_trace_param_act_notcompat        = 337182759L;
 const ISC_STATUS isc_trace_mandatory_switch_miss      = 337182760L;
-const ISC_STATUS isc_err_max                          = 1370;
+const ISC_STATUS isc_err_max                          = 1405;
 
 #else /* c definitions */
 
@@ -2347,7 +2382,42 @@ const ISC_STATUS isc_err_max                          = 1370;
 #define isc_invalid_timezone_offset          335545213L
 #define isc_invalid_timezone_region          335545214L
 #define isc_invalid_timezone_id              335545215L
-#define isc_bad_repl_handle                  335545216L
+#define isc_tom_decode64len                  335545216L
+#define isc_tom_strblob                      335545217L
+#define isc_tom_reg                          335545218L
+#define isc_tom_algorithm                    335545219L
+#define isc_tom_mode_miss                    335545220L
+#define isc_tom_mode_bad                     335545221L
+#define isc_tom_no_mode                      335545222L
+#define isc_tom_iv_miss                      335545223L
+#define isc_tom_no_iv                        335545224L
+#define isc_tom_ctrtype_bad                  335545225L
+#define isc_tom_no_ctrtype                   335545226L
+#define isc_tom_ctr_big                      335545227L
+#define isc_tom_no_ctr                       335545228L
+#define isc_tom_iv_length                    335545229L
+#define isc_tom_error                        335545230L
+#define isc_tom_yarrow_start                 335545231L
+#define isc_tom_yarrow_setup                 335545232L
+#define isc_tom_init_mode                    335545233L
+#define isc_tom_crypt_mode                   335545234L
+#define isc_tom_decrypt_mode                 335545235L
+#define isc_tom_init_cip                     335545236L
+#define isc_tom_crypt_cip                    335545237L
+#define isc_tom_decrypt_cip                  335545238L
+#define isc_tom_setup_cip                    335545239L
+#define isc_tom_setup_chacha                 335545240L
+#define isc_tom_encode                       335545241L
+#define isc_tom_decode                       335545242L
+#define isc_tom_rsa_import                   335545243L
+#define isc_tom_oaep                         335545244L
+#define isc_tom_hash_bad                     335545245L
+#define isc_tom_rsa_make                     335545246L
+#define isc_tom_rsa_export                   335545247L
+#define isc_tom_rsa_sign                     335545248L
+#define isc_tom_rsa_verify                   335545249L
+#define isc_tom_chacha_key                   335545250L
+#define isc_bad_repl_handle                  335545251L
 #define isc_gfix_db_name                     335740929L
 #define isc_gfix_invalid_sw                  335740930L
 #define isc_gfix_incmp_sw                    335740932L
@@ -2822,7 +2892,7 @@ const ISC_STATUS isc_err_max                          = 1370;
 #define isc_trace_switch_param_miss          337182758L
 #define isc_trace_param_act_notcompat        337182759L
 #define isc_trace_mandatory_switch_miss      337182760L
-#define isc_err_max                          1370
+#define isc_err_max                          1405
 
 #endif
 

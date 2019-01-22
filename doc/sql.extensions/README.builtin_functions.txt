@@ -177,6 +177,21 @@ Example:
     select atanh(x) from y;
 
 
+-----------------------------
+BASE64_ENCODE / BASE64_DECODE
+-----------------------------
+
+Function:
+	Encodes / decodes input data to / from BASE64 representation. Works with character strings and blobs.
+
+Format:
+	BASE64_ENCODE( <binary data> )
+	BASE64_DECODE( <base64 data> )
+
+Example:
+	select base64_encode(public_key) from clients;
+
+
 -------
 BIN_AND
 -------
@@ -344,6 +359,20 @@ Format:
 
 Example:
     select cot(x) from y;
+
+
+-----
+CRC32
+-----
+
+Function:
+	Returns CRC-32 with the polynomial 0x04C11DB7. Accepts argument of any type.
+
+Format:
+	CRC32( <any value> )
+
+Example:
+	select crc32(job_title) from job;
 
 
 -------
@@ -768,9 +797,9 @@ Example:
     select * from x order by rand();
 
 
---------------------
+----------------------
 RDB$GET_TRANSACTION_CN
---------------------
+----------------------
 
 (FB4 extension)
 Function:

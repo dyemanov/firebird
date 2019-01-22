@@ -311,6 +311,7 @@ void Provider::generateDPB(thread_db* tdbb, ClumpletWriter& dpb,
 			dpb.insertByte(isc_dpb_sql_dialect, 0);
 			dpb.insertString(isc_dpb_sql_role_name, role);
 		}
+
 		attachment->att_user->populateDpb(dpb, false);
 	}
 

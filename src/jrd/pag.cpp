@@ -879,7 +879,6 @@ AttNumber PAG_attachment_id(thread_db* tdbb)
 	}
 
 	attachment->initLocks(tdbb);
-	Monitoring::publishAttachment(tdbb);
 
 	return attachment->att_attachment_id;
 }
