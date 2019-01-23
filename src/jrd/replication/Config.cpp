@@ -50,10 +50,12 @@ namespace
 	const char* REPLICATION_CFGFILE = "replication.conf";
 
 	const ULONG DEFAULT_BUFFER_SIZE = 1024 * 1024; 				// 1 MB
-	const ULONG DEFAULT_LOG_SEGMENT_SIZE = 16 * 1024 * 1024;		// 16 MB
+	const ULONG DEFAULT_LOG_SEGMENT_SIZE = 16 * 1024 * 1024;	// 16 MB
 	const ULONG DEFAULT_LOG_SEGMENT_COUNT = 8;
-	const ULONG DEFAULT_LOG_ARCHIVE_TIMEOUT = 60;
+	const ULONG DEFAULT_LOG_ARCHIVE_TIMEOUT = 60;				// seconds
 	const ULONG DEFAULT_LOG_GROUP_FLUSH_DELAY = 0;
+	const ULONG DEFAULT_APPLY_IDLE_TIMEOUT = 10;				// seconds
+	const ULONG DEFAULT_APPLY_ERROR_TIMEOUT = 60;				// seconds
 
 	void parseLong(const string& input, ULONG& output)
 	{
@@ -94,7 +96,10 @@ Config::Config()
 	  logArchiveCommand(getPool()),
 	  logArchiveTimeout(DEFAULT_LOG_ARCHIVE_TIMEOUT),
 	  syncReplicas(getPool()),
-	  logSourceDirectory(getPool())
+	  logSourceDirectory(getPool()),
+	  verboseLogging(false),
+	  applyIdleTimeout(DEFAULT_APPLY_IDLE_TIMEOUT),
+	  applyErrorTimeout(DEFAULT_APPLY_ERROR_TIMEOUT)
 {
 	sourceGuid.alignment = 0;
 }
@@ -268,6 +273,19 @@ void Config::enumerate(Firebird::Array<Config*>& replicas)
 			else if (key == "source_guid")
 			{
 				StringToGuid(&config->sourceGuid, value.c_str());
+			}
+			else if (key == "verbose_logging")
+			{
+				if (value == "true" || value == "yes" || value == "on" || value == "1")
+					config->verboseLogging = true;
+			}
+			else if (key == "apply_idle_timeout")
+			{
+				parseLong(value, config->applyIdleTimeout);
+			}
+			else if (key == "apply_error_timeout")
+			{
+				parseLong(value, config->applyErrorTimeout);
 			}
 		}
 

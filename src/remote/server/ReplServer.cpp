@@ -84,9 +84,6 @@ namespace
 	const USHORT CTL_VERSION1 = 1;
 	const USHORT CTL_CURRENT_VERSION = CTL_VERSION1;
 
-	const ULONG REPL_IDLE_TIMEOUT = 10;		// seconds
-	const ULONG REPL_ERROR_TIMEOUT = 60;	// seconds
-
 	volatile bool* shutdownPtr = NULL;
 	AtomicCounter activeThreads;
 
@@ -431,14 +428,17 @@ namespace
 
 		void verbose(const char* msg, ...) const
 		{
-			char buffer[BUFFER_LARGE];
+			if (m_config->verboseLogging)
+			{
+				char buffer[BUFFER_LARGE];
 
-			va_list ptr;
-			va_start(ptr, msg);
-			VSNPRINTF(buffer, sizeof(buffer), msg, ptr);
-			va_end(ptr);
+				va_list ptr;
+				va_start(ptr, msg);
+				VSNPRINTF(buffer, sizeof(buffer), msg, ptr);
+				va_end(ptr);
 
-			logMessage(buffer, VERBOSE_MSG);
+				logMessage(buffer, VERBOSE_MSG);
+			}
 		}
 
 	private:
@@ -901,6 +901,7 @@ namespace
 		fb_assert(shutdownPtr);
 
 		AutoPtr<Target> target(static_cast<Target*>(arg));
+		const auto config = target->getConfig();
 
 		target->verbose("Started replication thread");
 
@@ -919,7 +920,7 @@ namespace
 			if (!*shutdownPtr)
 			{
 				const ULONG timeout =
-					(ret == PROCESS_SUSPEND) ? REPL_IDLE_TIMEOUT : REPL_ERROR_TIMEOUT;
+					(ret == PROCESS_SUSPEND) ? config->applyIdleTimeout : config->applyErrorTimeout;
 
 				target->verbose("Going to sleep for %u seconds", timeout);
 
