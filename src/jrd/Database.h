@@ -538,6 +538,7 @@ public:
 	void exceptionHandler(const Firebird::Exception& ex, ThreadFinishSync<Database*>::ThreadRoutine* routine);
 
 	void ensureGuid(thread_db* tdbb);
+	FB_UINT64 getReplSequence(thread_db* tdbb);
 	void setReplSequence(thread_db* tdbb, FB_UINT64 sequence);
 
 private:

@@ -1030,8 +1030,7 @@ void PAG_format_pip(thread_db* tdbb, PageSpace& pageSpace)
 }
 
 
-#ifdef NOT_USED_OR_REPLACED
-bool PAG_get_clump(thread_db* tdbb, SLONG page_num, USHORT type, USHORT* inout_len, UCHAR* entry)
+bool PAG_get_clump(thread_db* tdbb, USHORT type, USHORT* inout_len, UCHAR* entry)
 {
 /***********************************************
  *
@@ -1040,7 +1039,7 @@ bool PAG_get_clump(thread_db* tdbb, SLONG page_num, USHORT type, USHORT* inout_l
  ***********************************************
  *
  * Functional description
- *	Find 'type' clump in page_num
+ *	Find 'type' clump
  *		true  - Found it
  *		false - Not present
  *	RETURNS
@@ -1050,11 +1049,7 @@ bool PAG_get_clump(thread_db* tdbb, SLONG page_num, USHORT type, USHORT* inout_l
  **************************************/
 	SET_TDBB(tdbb);
 
-	WIN window(DB_PAGE_SPACE, page_num);
-
-	if (page_num != HEADER_PAGE)
-		ERR_post(Arg::Gds(isc_page_type_err));
-
+	WIN window(DB_PAGE_SPACE, HEADER_PAGE);
 	pag* page = CCH_FETCH(tdbb, &window, LCK_read, pag_header);
 
 	UCHAR* entry_p;
@@ -1082,7 +1077,6 @@ bool PAG_get_clump(thread_db* tdbb, SLONG page_num, USHORT type, USHORT* inout_l
 
 	return true;
 }
-#endif
 
 
 void PAG_header(thread_db* tdbb, bool info)

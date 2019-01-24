@@ -333,6 +333,15 @@ namespace Jrd
 		}
 	}
 
+	FB_UINT64 Database::getReplSequence(thread_db* tdbb)
+	{
+		USHORT length = sizeof(FB_UINT64);
+		if (!PAG_get_clump(tdbb, Ods::HDR_repl_seq, &length, (UCHAR*) &dbb_repl_sequence))
+			return 0;
+
+		return dbb_repl_sequence;
+	}
+
 	void Database::setReplSequence(thread_db* tdbb, FB_UINT64 sequence)
 	{
 		if (dbb_repl_sequence != sequence)

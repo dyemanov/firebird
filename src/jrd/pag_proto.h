@@ -49,9 +49,7 @@ AttNumber	PAG_attachment_id(Jrd::thread_db*);
 bool	PAG_delete_clump_entry(Jrd::thread_db* tdbb, USHORT);
 void	PAG_format_header(Jrd::thread_db*);
 void	PAG_format_pip(Jrd::thread_db*, Jrd::PageSpace& pageSpace);
-#ifdef NOT_USED_OR_REPLACED
-bool	PAG_get_clump(Jrd::thread_db* tdbb, SLONG, USHORT, USHORT*, UCHAR*);
-#endif
+bool	PAG_get_clump(Jrd::thread_db*, USHORT, USHORT*, UCHAR*);
 void	PAG_header(Jrd::thread_db*, bool);
 void	PAG_header_init(Jrd::thread_db*);
 void	PAG_init(Jrd::thread_db*);

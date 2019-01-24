@@ -764,7 +764,10 @@ void Applier::executeSql(thread_db* tdbb,
 	const auto dialect =
 		(dbb->dbb_flags & DBB_DB_SQL_dialect_3) ? SQL_DIALECT_V6 : SQL_DIALECT_V5;
 
-//	AutoSetRestore<string> autoOwner(&attachment->att_repl_owner, owner);
+	UserId user(*attachment->att_user);
+	user.setUserName(owner);
+
+	AutoSetRestore<UserId*> autoOwner(&attachment->att_user, &user);
 
 	DSQL_execute_immediate(tdbb, attachment, &transaction,
 						   0, sql.c_str(), dialect,

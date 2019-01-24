@@ -321,6 +321,7 @@ const char
 	EXT_CONN_POOL_IDLE[] = "EXT_CONN_POOL_IDLE_COUNT",
 	EXT_CONN_POOL_ACTIVE[] = "EXT_CONN_POOL_ACTIVE_COUNT",
 	EXT_CONN_POOL_LIFETIME[] = "EXT_CONN_POOL_LIFETIME",
+	REPLICATION_SEQ_NAME[] = "REPLICATION_SEQUENCE",
 	// SYSTEM namespace: connection wise items
 	SESSION_ID_NAME[] = "SESSION_ID",
 	NETWORK_PROTOCOL_NAME[] = "NETWORK_PROTOCOL",
@@ -3973,6 +3974,8 @@ dsc* evlGetContext(thread_db* tdbb, const SysFunction*, const NestValueArray& ar
 		}
 		else if (nameStr == EXT_CONN_POOL_LIFETIME)
 			resultStr.printf("%d", EDS::Manager::getConnPool()->getLifeTime());
+		else if (nameStr == REPLICATION_SEQ_NAME)
+			resultStr.printf("%" UQUADFORMAT, dbb->getReplSequence(tdbb));
 		else
 		{
 			// "Context variable %s is not found in namespace %s"

@@ -21,6 +21,7 @@
  */
 
 #include "firebird.h"
+#include "firebird/Message.h"
 #include "../common/common.h"
 #include "../jrd/constants.h"
 #include "../jrd/ibase.h"
@@ -33,6 +34,7 @@
 #include "../common/classes/ClumpletWriter.h"
 #include "../common/classes/MetaName.h"
 #include "../common/ThreadStart.h"
+#include "../common/utils_proto.h"
 #include "../common/utils_proto.h"
 
 #include "../jrd/replication/Applier.h"
@@ -367,6 +369,27 @@ namespace
 
 			m_replicator = m_attachment->createReplicator(&localStatus);
 			localStatus.check();
+
+			fb_assert(!m_sequence);
+
+			const auto transaction = m_attachment->startTransaction(&localStatus, 0, NULL);
+			localStatus.check();
+
+			const char* sql =
+				"select rdb$get_context('SYSTEM', 'REPLICATION_SEQUENCE') from rdb$database";
+
+			FB_MESSAGE(Result, CheckStatusWrapper,
+				(FB_BIGINT, sequence)
+			) result(&localStatus, fb_get_master_interface());
+
+			m_attachment->execute(&localStatus, transaction, 0, sql, SQL_DIALECT_V6,
+								  NULL, NULL, result.getMetadata(), result.getData());
+			localStatus.check();
+
+			transaction->commit(&localStatus);
+			localStatus.check();
+
+			m_sequence = result->sequence;
 #endif
 			m_connected = true;
 
@@ -693,31 +716,23 @@ namespace
 				ULONG last_offset = control.getOffset();
 
 				const FB_UINT64 db_sequence = target->initReplica();
+				const FB_UINT64 last_db_sequence = control.getDbSequence();
 
-				if (db_sequence)
+				if (sequence <= db_sequence)
 				{
-					if (sequence <= db_sequence)
-					{
-						target->verbose("Deleting file (%s) due to fast forward", segment->filename.c_str());
-						segment->remove();
-						continue;
-					}
+					target->verbose("Deleting file (%s) due to fast forward", segment->filename.c_str());
+					segment->remove();
+					continue;
+				}
 
-					if (sequence == db_sequence + 1)
-						control.saveDbSequence(db_sequence);
-
-					if (control.getDbSequence() && db_sequence != control.getDbSequence())
-						raiseError("Replica is too old, re-initialization is required");
-
-					if (last_sequence < db_sequence)
-					{
-						target->verbose("Resetting replication to continue from segment %" UQUADFORMAT, db_sequence + 1);
-
-						transactions.clear();
-						control.saveComplete(db_sequence, transactions);
-						last_sequence = db_sequence;
-						last_offset = 0;
-					}
+				if (db_sequence != last_db_sequence)
+				{
+					target->verbose("Resetting replication to continue from segment %" UQUADFORMAT, db_sequence + 1);
+					control.saveDbSequence(db_sequence);
+					transactions.clear();
+					control.saveComplete(db_sequence, transactions);
+					last_sequence = db_sequence;
+					last_offset = 0;
 				}
 
 				FB_UINT64 oldest_sequence = getOldestSequence(transactions);
