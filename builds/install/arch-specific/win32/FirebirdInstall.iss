@@ -478,6 +478,8 @@ Source: {#FilesDir}\firebird.conf; DestDir: {app}; DestName: firebird.conf; Comp
 Source: {#FilesDir}\fbtrace.conf; DestDir: {app}; DestName: fbtrace.conf.default; Components: ServerComponent;
 Source: {#FilesDir}\fbtrace.conf; DestDir: {app}; DestName: fbtrace.conf; Components: ServerComponent; Flags: uninsneveruninstall onlyifdoesntexist; check: NofbtraceConfExists;
 Source: {#FilesDir}\databases.conf; DestDir: {app}; Components: ClientComponent; Flags: uninsneveruninstall onlyifdoesntexist
+Source: {#FilesDir}\replication.conf; DestDir: {app}; DestName: replication.conf.default; Components: ServerComponent;
+Source: {#FilesDir}\replication.conf; DestDir: {app}; Components: ServerComponent; Flags: uninsneveruninstall onlyifdoesntexist; check: NoReplicationConfExists;
 Source: {#FilesDir}\security4.fdb; DestDir: {app}; Destname: security4.fdb.empty; Components: ServerComponent;
 Source: {#FilesDir}\security4.fdb; DestDir: {app}; Components: ServerComponent; Flags: uninsneveruninstall onlyifdoesntexist
 Source: {#FilesDir}\firebird.msg; DestDir: {app}; Components: ClientComponent; Flags: sharedfile ignoreversion
@@ -1054,6 +1056,7 @@ begin
       IncrementSharedCount(Is64BitInstallMode, GetAppPath+'\databases.conf', false);
       IncrementSharedCount(Is64BitInstallMode, GetAppPath+'\fbtrace.conf', false);
       IncrementSharedCount(Is64BitInstallMode, GetAppPath+'\security4.fdb', false);
+      IncrementSharedCount(Is64BitInstallMode, GetAppPath+'\replication.conf', false);
 
 			InitSecurityDB;
 
@@ -1131,6 +1134,16 @@ begin
   Result := not fileexists(GetAppPath+'\fbtrace.conf');
 end;
 
+function ReplicationConfExists: boolean;
+begin
+  Result := fileexists(GetAppPath+'\replication.conf');
+end;
+
+function NoReplicationConfExists: boolean;
+begin
+  Result := not fileexists(GetAppPath+'\replication.conf');
+end;
+
 function InitializeUninstall: Boolean;
 var
   CommandLine: String;
@@ -1170,6 +1183,7 @@ begin
           aStringList.add(appPath+'\fbtrace.conf');
           aStringList.add(appPath+'\security4.fdb');
           aStringList.add(appPath+'\security4.fdb.old');
+          aStringList.add(appPath+'\replication.conf');
 
           for count := 0 to aStringList.count - 1 do begin
       // We are manually handling the share count of these files, so we must

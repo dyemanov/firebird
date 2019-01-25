@@ -291,6 +291,8 @@ copyFiles() {
     cp $BuiltFBDir/firebird.conf ${TargetDir}@FB_CONFDIR@
     cp $BuiltFBDir/databases.conf ${TargetDir}@FB_CONFDIR@
     cp $BuiltFBDir/fbtrace.conf ${TargetDir}@FB_CONFDIR@
+    cp $BuiltFBDir/plugins.conf ${TargetDir}@FB_CONFDIR@
+    cp $BuiltFBDir/replication.conf ${TargetDir}@FB_CONFDIR@
 
 	chown root:wheel ${TargetDir}@FB_CONFDIR@/*.conf
 	chmod 0644 ${TargetDir}@FB_CONFDIR@/*.conf
