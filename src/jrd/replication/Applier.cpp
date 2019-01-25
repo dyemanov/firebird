@@ -183,6 +183,9 @@ Applier* Applier::create(thread_db* tdbb)
 
 	const auto attachment = tdbb->getAttachment();
 
+	if (!attachment->locksmith(tdbb, REPLICATE_INTO_DATABASE))
+		status_exception::raise(Arg::Gds(isc_miss_prvlg) << "REPLICATE_INTO_DATABASE");
+
 	const auto req_pool = attachment->createPool();
 	Jrd::ContextPoolHolder context(tdbb, req_pool);
 	AutoPtr<CompilerScratch> csb(FB_NEW_POOL(*req_pool) CompilerScratch(*req_pool));
