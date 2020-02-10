@@ -52,9 +52,14 @@ YValve_Objects:= $(call dirObjects,yvalve) $(call dirObjects,yvalve/config)
 AllObjects += $(YValve_Objects)
 
 
+# Authentication database connections cache
+SecDbCache:= $(call makeObjects,auth,SecDbCache.cpp)
+
+
 # Remote
 Remote_Common:= $(call dirObjects,remote) $(call dirObjects,auth/SecureRemotePassword)
-Remote_Server:= $(call dirObjects,remote/server) $(call dirObjects,auth/SecureRemotePassword/server)
+Remote_Server:= $(call dirObjects,remote/server) $(call dirObjects,auth/SecureRemotePassword/server) \
+				$(SecDbCache)
 Remote_Client:= $(call dirObjects,remote/client) $(call dirObjects,auth/SecureRemotePassword/client) \
 				$(call makeObjects,auth/SecurityDatabase,LegacyClient.cpp) \
 				$(call dirObjects,plugins/crypt/arc4)
@@ -171,7 +176,7 @@ AllObjects += $(LEGACY_USERS_MANAGE_Objects)
 
 
 # Legacy authentication on server
-LEGACY_AUTH_SERVER_Objects:= $(call makeObjects,auth/SecurityDatabase,LegacyServer.cpp)
+LEGACY_AUTH_SERVER_Objects:= $(call makeObjects,auth/SecurityDatabase,LegacyServer.cpp) $(SecDbCache)
 
 AllObjects += $(LEGACY_AUTH_SERVER_Objects)
 

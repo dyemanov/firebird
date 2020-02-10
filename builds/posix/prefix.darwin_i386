@@ -20,9 +20,9 @@
 # Default build from 10.9 using Clang
 #
 # Build instructions
-# set CFLAGS='-I ICUDIR/icu/source/common -m32 -arch i386' (ucnv.h)
-# set LDFLAGS='-L ICUDIR/icu/source/lib -m32 -arch i386' (-licuuc)
-# set CXXFLAGS='-I ICUDIR/icu/source/common -I ICUDIR/icu/source/i18n -m32 -arch i386'
+# set CFLAGS='-I (ICUDIR)/icu/source/common -m32 -arch i386' (ucnv.h)
+# set LDFLAGS='-L(ICUDIR)/icu/source/lib -m32 -arch i386' (-licuuc)
+# set CXXFLAGS='-I (ICUDIR)/icu/source/common -I ICUDIR/icu/source/i18n -m32 -arch i386'
 # where ICUDIR is where you installed ICU
 # configure using --with-builtin-tommath
 # or add the relevant -I, -L for an installed version of libtommath

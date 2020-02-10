@@ -134,6 +134,7 @@ void write_global_fields();
 void write_generators();
 void write_sql_roles();
 void write_mapping();
+void write_db_creators();
 void write_packages();
 void write_procedures();
 void write_procedure_prms(const GDS_NAME, const GDS_NAME);
@@ -406,6 +407,11 @@ int BACKUP_backup(const TEXT* dbb_file, const TEXT* file_name)
 		BURP_verbose(296);
 		// msg 296 writing mapping
 		write_mapping();
+
+		// Write database creators
+		BURP_verbose(391);
+		// msg 391 writing database creators
+		write_db_creators();
 	}
 
 	// Finish up
@@ -1748,7 +1754,7 @@ void put_data(burp_rel* relation)
 	else
 		xdr_buffer.lstr_address = NULL;
 
-	ULONG records = 0;
+	FB_UINT64 records = 0;
 	while (true)
 	{
 		if (isc_receive(status_vector, &request, 0, length, buffer, 0))
@@ -4142,6 +4148,63 @@ void write_mapping()
 				BURP_verbose (297, ADMIN_ROLE);
 				// msg 297 writing mapping for @1
 			}
+
+		END_FOR;
+		ON_ERROR
+			general_on_error();
+		END_ERROR;
+	}
+
+	MISC_release_request_silent(req_handle);
+}
+
+
+void write_db_creators()
+{
+/**************************************
+ *
+ *	w r i t e _ d b _ c r e a t o r s
+ *
+ **************************************
+ *
+ * Functional description
+ * 	write a record in the burp file for
+ *	each grant to create database.
+ *
+ **************************************/
+	isc_req_handle req_handle = 0;
+	TEXT temp[GDS_NAME_LEN];
+
+	BurpGlobals* tdgbl = BurpGlobals::getSpecific();
+
+	if (tdgbl->runtimeODS >= DB_VERSION_DDL12)
+	{
+		FOR (REQUEST_HANDLE req_handle)
+			C IN RDB$DB_CREATORS
+
+			bool fl = true;
+
+			if (!C.RDB$USER_TYPE.NULL)
+			{
+				put(tdgbl, rec_db_creator);
+				fl = false;
+				put_int32(att_dbc_type, C.RDB$USER_TYPE);
+			}
+
+			if (!C.RDB$USER.NULL)
+			{
+				if (fl)
+					put(tdgbl, rec_db_creator);
+				fl = false;
+				const SSHORT l = PUT_TEXT(att_dbc_user, C.RDB$USER);
+
+				MISC_terminate (C.RDB$USER, temp, l, sizeof(temp));
+				BURP_verbose (392, temp);
+				// msg 392 writing db creator %s
+			}
+
+			if (!fl)
+				put(tdgbl, att_end);
 
 		END_FOR;
 		ON_ERROR

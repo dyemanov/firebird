@@ -34,6 +34,7 @@
 #define ISQL_ISQL_H
 
 #include "../jrd/flags.h"
+#include "../jrd/constants.h"
 #include <stdlib.h>
 
 // Define lengths used in isql.e
@@ -84,6 +85,14 @@ enum LegacyTables
 	SQL_objects,
 	ALL_objects
 };
+
+const size_t CHARSET_COLLATE_SIZE	=
+	(MAX_SQL_IDENTIFIER_LEN + 2 /* quotes */) * 2 +	// charset and collate names
+	14 +	// CHARACTER SET
+	9 +		// NOT NULL
+	8 +		// COLLATE
+	30 +	// extra space
+	1;		// null terminator
 
 const size_t WORDLENGTH				= 32;
 // The worst case of a quoted identifier is 31 * 2 => 62 + 2 DQUOTES + TERM => 65.

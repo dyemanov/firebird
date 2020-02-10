@@ -1,3 +1,5 @@
+TARGET ?= Release
+
 # EKU: taken from Makefile.in.firebird
 ROOT=..
 
@@ -18,7 +20,7 @@ FB_REV_NO:=$(shell cpp -DDARWIN -I. ../builds/install/arch-specific/darwin/revno
 FB_BUILD_NO:=$(shell cpp -DDARWIN -I. ../builds/install/arch-specific/darwin/buildno.c | tail -2 | sed -e 's/" "//g' -e 's/"//g')
 FB_PLATFORM:=$(CpuType)
 
-package: package_firebird 
+package: package_firebird
 
 package_firebird: INST_NM=Firebird-$(FB_MAJOR_VERS).$(FB_MINOR_VERS).$(FB_REV_NO)-$(FB_BUILD_NO)-$(FB_PLATFORM)
 package_firebird:
@@ -29,7 +31,7 @@ package_firebird:
 			-e 's/_MINOR_VERS_/$(FB_MINOR_VERS)/g' \
 			-e 's/_REV_NO_/$(FB_REV_NO)/g' \
 			../builds/install/arch-specific/darwin/Info.plist \
-			> $(ROOT)/gen/Release/frameworks/Firebird3.framework/Resources/Info.plist
+			> $(ROOT)/gen/$(TARGET)/frameworks/Firebird3.framework/Resources/Info.plist
 	sed -e 's/_FB_BUILD_SUFFIX_/$(FB_VER_SUFFIX)/g' \
 			-e 's/_SMFB_BUILD_SUFFIX_/$(FB_VER_SUFFIX_SM)/g' \
 			-e 's/_MFB_BUILD_SUFFIX_/$(FB_VER_SUFFIX_M)/g' \
@@ -37,40 +39,40 @@ package_firebird:
 			-e 's/_MINOR_VERS_/$(FB_MINOR_VERS)/g' \
 			-e 's/_REV_NO_/$(FB_REV_NO)/g' \
 			../builds/install/arch-specific/darwin/Description.plist \
-			> $(ROOT)/gen/Release/frameworks/Firebird3.framework/Resources/Description.plist
-	
-	rm -fr $(ROOT)/gen/Release/scripts
-	mkdir $(ROOT)/gen/Release/scripts
-	cp ../builds/install/arch-specific/darwin/install-script \
-			$(ROOT)/gen/Release/scripts/postinstall
-	cp ../builds/install/arch-specific/darwin/preupgrade-script \
-			$(ROOT)/gen/Release/scripts/preinstall
-	chmod u+x $(ROOT)/gen/Release/scripts/postinstall
-	chmod u+x $(ROOT)/gen/Release/scripts/preinstall
-	
-	rm -fr $(ROOT)/gen/Release/resources
-	mkdir $(ROOT)/gen/Release/resources
-	cp ../builds/install/arch-specific/darwin/Welcome.txt \
-			$(ROOT)/gen/Release/resources/Welcome.txt
-	cp ../builds/install/arch-specific/darwin/Readme.txt \
-			$(ROOT)/gen/Release/resources/Readme.txt
-	cp ../builds/install/arch-specific/darwin/License.txt \
-			$(ROOT)/gen/Release/resources/License.txt
-	cp ../builds/install/arch-specific/darwin/Distribution.xml \
-			$(ROOT)/gen/Release/Distribution.xml 
+			> $(ROOT)/gen/$(TARGET)/frameworks/Firebird3.framework/Resources/Description.plist
 
-	rm -fr Release/packages
-	mkdir Release/packages
-	pkgbuild --root $(ROOT)/gen/Release/frameworks/Firebird3.framework \
+	rm -fr $(ROOT)/gen/$(TARGET)/scripts
+	mkdir $(ROOT)/gen/$(TARGET)/scripts
+	cp ../builds/install/arch-specific/darwin/install-script \
+			$(ROOT)/gen/$(TARGET)/scripts/postinstall
+	cp ../builds/install/arch-specific/darwin/preupgrade-script \
+			$(ROOT)/gen/$(TARGET)/scripts/preinstall
+	chmod u+x $(ROOT)/gen/$(TARGET)/scripts/postinstall
+	chmod u+x $(ROOT)/gen/$(TARGET)/scripts/preinstall
+
+	rm -fr $(ROOT)/gen/$(TARGET)/resources
+	mkdir $(ROOT)/gen/$(TARGET)/resources
+	cp ../builds/install/arch-specific/darwin/Welcome.txt \
+			$(ROOT)/gen/$(TARGET)/resources/Welcome.txt
+	cp ../builds/install/arch-specific/darwin/Readme.txt \
+			$(ROOT)/gen/$(TARGET)/resources/Readme.txt
+	cp ../builds/install/arch-specific/darwin/License.txt \
+			$(ROOT)/gen/$(TARGET)/resources/License.txt
+	cp ../builds/install/arch-specific/darwin/Distribution.xml \
+			$(ROOT)/gen/$(TARGET)/Distribution.xml
+
+	rm -fr $(TARGET)/packages
+	mkdir $(TARGET)/packages
+	pkgbuild --root $(ROOT)/gen/$(TARGET)/frameworks/Firebird3.framework \
 			--identifier com.firebirdsql.Firebird \
 			--install-location /Library/Frameworks/Firebird.framework \
-			--scripts $(ROOT)/gen/Release/scripts \
-			Release/packages/Firebird.pkg
+			--scripts $(ROOT)/gen/$(TARGET)/scripts \
+			$(TARGET)/packages/Firebird.pkg
 
-	productbuild --distribution Release/Distribution.xml \
-			--resources Release/resources \
-			--package-path Release/packages \
-			Release/$(INST_NM).pkg
+	productbuild --distribution $(TARGET)/Distribution.xml \
+			--resources $(TARGET)/resources \
+			--package-path $(TARGET)/packages \
+			$(TARGET)/$(INST_NM).pkg
 
 
 

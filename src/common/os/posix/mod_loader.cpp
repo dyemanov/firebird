@@ -131,16 +131,25 @@ void* DlfcnModule::findSymbol(const Firebird::string& symName)
 
 		result = dlsym(module, newSym.c_str());
 	}
+	if (!result)
+		return NULL;
 
 #ifdef HAVE_DLADDR
-	if (!PathUtils::isRelative(fileName))
+	Dl_info info;
+	if (!dladdr(result, &info))
+		return NULL;
+
+	if (PathUtils::isRelative(fileName) || PathUtils::isRelative(info.dli_fname))
 	{
-		Dl_info info;
-		if (!dladdr(result, &info))
-			return NULL;
-		if (fileName != info.dli_fname)
+		// check only name (not path) of the library
+		Firebird::PathName dummyDir, nm1, nm2;
+		PathUtils::splitLastComponent(dummyDir, nm1, fileName);
+		PathUtils::splitLastComponent(dummyDir, nm2, info.dli_fname);
+		if (nm1 != nm2)
 			return NULL;
 	}
+	else if (fileName != info.dli_fname)
+		return NULL;
 #endif
 
 	return result;

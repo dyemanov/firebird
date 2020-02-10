@@ -236,7 +236,15 @@ void TracePluginImpl::logRecord(const char* action)
 	// TODO: implement adjusting of line breaks
 	// line.adjustLineBreaks();
 
-	logWriter->write(record.c_str(), record.length());
+	LocalStatus ls;
+	CheckStatusWrapper status(&ls);
+
+	logWriter->write_s(&status, record.c_str(), record.length());
+
+	if (ls.getState() & IStatus::STATE_ERRORS && ls.getErrors()[1] == isc_interface_version_too_old)
+		logWriter->write(record.c_str(), record.length());
+	else
+		check(&status);
 
 	record = "";
 }
@@ -290,7 +298,10 @@ void TracePluginImpl::logRecordConn(const char* action, ITraceDatabaseConnection
 void TracePluginImpl::logRecordTrans(const char* action, ITraceDatabaseConnection* connection,
 	ITraceTransaction* transaction)
 {
-	const TraNumber tra_id = transaction->getTransactionID();
+	TraNumber tra_id = transaction->getPreviousID();
+	if (!tra_id)
+		tra_id = transaction->getTransactionID();
+
 	bool reg = false;
 	while (true)
 	{
@@ -308,7 +319,7 @@ void TracePluginImpl::logRecordTrans(const char* action, ITraceDatabaseConnectio
 		if (reg)
 		{
 			string temp;
-			temp.printf("\t\t(TRA_%" SQUADFORMAT", <unknown, bug?>)" NEWLINE, transaction->getTransactionID());
+			temp.printf("\t\t(TRA_%" SQUADFORMAT", <unknown, bug?>)" NEWLINE, tra_id);
 			record.insert(0, temp);
 			break;
 		}
@@ -1187,9 +1198,19 @@ void TracePluginImpl::log_event_detach(ITraceDatabaseConnection* connection, FB_
 void TracePluginImpl::register_transaction(ITraceTransaction* transaction)
 {
 	TransactionData trans_data;
-	trans_data.id = transaction->getTransactionID();
+	trans_data.id = transaction->getPreviousID();
+	if (!trans_data.id)
+		trans_data.id = transaction->getTransactionID();
+
 	trans_data.description = FB_NEW_POOL(*getDefaultMemoryPool()) string(*getDefaultMemoryPool());
 	trans_data.description->printf("\t\t(TRA_%" SQUADFORMAT", ", trans_data.id);
+
+	if (transaction->getInitialID() != transaction->getTransactionID())
+	{
+		string tmp;
+		tmp.printf("INIT_%" SQUADFORMAT", ", transaction->getInitialID());
+		trans_data.description->append(tmp);
+	}
 
 	switch (transaction->getIsolation())
 	{
@@ -1276,6 +1297,22 @@ void TracePluginImpl::log_event_transaction_end(ITraceDatabaseConnection* connec
 {
 	if (config.log_transactions)
 	{
+		if (retain_context || transaction->getInitialID() != transaction->getTransactionID())
+		{
+			string temp;
+			//temp.printf("\tInitial number %" SQUADFORMAT NEWLINE, transaction->getInitialID());
+			//record.append(temp);
+
+			if (retain_context)
+			{
+				//temp.printf("\tOld number %" SQUADFORMAT NEWLINE, transaction->getPreviousID());
+				//record.append(temp);
+
+				temp.printf("\tNew number %" SQUADFORMAT NEWLINE, transaction->getTransactionID());
+				record.append(temp);
+			}
+		}
+
 		PerformanceInfo* info = transaction->getPerf();
 		if (info)
 		{
@@ -1308,11 +1345,12 @@ void TracePluginImpl::log_event_transaction_end(ITraceDatabaseConnection* connec
 		logRecordTrans(event_type, connection, transaction);
 	}
 
-	if (!retain_context)
+	const ISC_INT64 delId = retain_context ? transaction->getPreviousID() : transaction->getTransactionID();
+	if (!retain_context || transaction->getPreviousID() != transaction->getTransactionID())
 	{
 		// Forget about the transaction
 		WriteLockGuard lock(transactionsLock, FB_FUNCTION);
-		if (transactions.locate(transaction->getTransactionID()))
+		if (transactions.locate(delId))
 		{
 			transactions.current().deallocate_references();
 			transactions.fastRemove();

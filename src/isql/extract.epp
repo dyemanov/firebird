@@ -405,10 +405,13 @@ int EXTRACT_list_table(const SCHAR* relation_name,
 
 			if ((FLD.RDB$FIELD_TYPE == T_CHAR) || (FLD.RDB$FIELD_TYPE == VARCHAR))
 			{
-				if (FLD.RDB$CHARACTER_LENGTH.NULL)
-					isqlGlob.printf("(%d)", FLD.RDB$FIELD_LENGTH);
-				else
-					isqlGlob.printf("(%d)", FLD.RDB$CHARACTER_LENGTH);
+				isqlGlob.printf("(%d)",
+					ISQL_get_char_length(
+						FLD.RDB$FIELD_LENGTH,
+						FLD.RDB$CHARACTER_LENGTH.NULL, FLD.RDB$CHARACTER_LENGTH,
+						FLD.RDB$CHARACTER_SET_ID.NULL, FLD.RDB$CHARACTER_SET_ID
+					)
+				);
 			}
 
 			// Catch arrays after printing the type
@@ -465,6 +468,22 @@ int EXTRACT_list_table(const SCHAR* relation_name,
 			{
 				if (!FLD.RDB$COMPUTED_SOURCE.NULL)
 					ISQL_print_validation (isqlGlob.Out, &FLD.RDB$COMPUTED_SOURCE, true, fbTrans);
+			}
+			else if (collation)
+			{
+				SCHAR collate_name[CHARSET_COLLATE_SIZE];
+				collate_name[0] = '\0';
+				ISQL_get_character_sets(char_set_id, collation, true, false, true, collate_name);
+
+				if (collate_name[0])
+				{
+					isqlGlob.printf("(CAST(NULL AS VARCHAR(1)%s)", char_sets);
+					isqlGlob.printf("%s)", collate_name);
+				}
+				else
+					isqlGlob.printf("(NULL)");
+
+				collation = 0;
 			}
 			else
 				isqlGlob.printf("(NULL)");
@@ -796,10 +815,13 @@ static void get_procedure_args(const char* proc_name)
 				//   FSG 18.Nov.2000
 				if ((FLD.RDB$FIELD_TYPE == T_CHAR) || (FLD.RDB$FIELD_TYPE == VARCHAR))
 				{
-					if (FLD.RDB$CHARACTER_LENGTH.NULL)
-						isqlGlob.printf("(%d)", FLD.RDB$FIELD_LENGTH);
-					else
-						isqlGlob.printf("(%d)", FLD.RDB$CHARACTER_LENGTH);
+					isqlGlob.printf("(%d)",
+						ISQL_get_char_length(
+							FLD.RDB$FIELD_LENGTH,
+							FLD.RDB$CHARACTER_LENGTH.NULL, FLD.RDB$CHARACTER_LENGTH,
+							FLD.RDB$CHARACTER_SET_ID.NULL, FLD.RDB$CHARACTER_SET_ID
+						)
+					);
 				}
 
 				// Show international character sets and collations
@@ -1012,10 +1034,13 @@ static void get_function_args_ods12(const char* func_name, USHORT out_arg)
 				//   FSG 18.Nov.2000
 				if ((FLD.RDB$FIELD_TYPE == T_CHAR) || (FLD.RDB$FIELD_TYPE == VARCHAR))
 				{
-					if (FLD.RDB$CHARACTER_LENGTH.NULL)
-						isqlGlob.printf("(%d)", FLD.RDB$FIELD_LENGTH);
-					else
-						isqlGlob.printf("(%d)", FLD.RDB$CHARACTER_LENGTH);
+					isqlGlob.printf("(%d)",
+						ISQL_get_char_length(
+							FLD.RDB$FIELD_LENGTH,
+							FLD.RDB$CHARACTER_LENGTH.NULL, FLD.RDB$CHARACTER_LENGTH,
+							FLD.RDB$CHARACTER_SET_ID.NULL, FLD.RDB$CHARACTER_SET_ID
+						)
+					);
 				}
 
 				// Show international character sets and collations
@@ -2535,10 +2560,13 @@ static void listRelationComputed(LegacyTables flag, SSHORT default_char_set_id)
 
 				if ((FLD.RDB$FIELD_TYPE == T_CHAR) || (FLD.RDB$FIELD_TYPE == VARCHAR))
 				{
-					if (FLD.RDB$CHARACTER_LENGTH.NULL)
-						isqlGlob.printf("(%d)", FLD.RDB$FIELD_LENGTH);
-					else
-						isqlGlob.printf("(%d)", FLD.RDB$CHARACTER_LENGTH);
+					isqlGlob.printf("(%d)",
+						ISQL_get_char_length(
+							FLD.RDB$FIELD_LENGTH,
+							FLD.RDB$CHARACTER_LENGTH.NULL, FLD.RDB$CHARACTER_LENGTH,
+							FLD.RDB$CHARACTER_SET_ID.NULL, FLD.RDB$CHARACTER_SET_ID
+						)
+					);
 				}
 
 				// Catch arrays after printing the type

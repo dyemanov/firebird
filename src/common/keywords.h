@@ -36,9 +36,4 @@ struct tok
 typedef tok TOK;
 typedef const TOK* Tokens;
 
-// These symbols are exported
-extern "C"
-{
-	int API_ROUTINE KEYWORD_stringIsAToken(const char*);
-	Tokens API_ROUTINE KEYWORD_getTokens();
-}
+Tokens keywordGetTokens();

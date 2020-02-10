@@ -67,16 +67,6 @@ void		REMOTE_check_response(Firebird::IStatus* warning, Rdb* rdb, PACKET* packet
 bool		REMOTE_inflate(rem_port*, PacketReceive*, UCHAR*, SSHORT, SSHORT*);
 bool		REMOTE_deflate(XDR*, ProtoWrite*, PacketSend*, bool flash);
 
-static inline void REMOTE_parseList(Remote::ParsedList& parsed, const Firebird::PathName& list)
-{
-	Auth::parseList(parsed, list);
-}
-
-static inline void REMOTE_makeList(Firebird::PathName& list, const Remote::ParsedList& parsed)
-{
-	Auth::makeList(list, parsed);
-}
-
 extern signed char wcCompatible[3][3];
 
 #define HANDSHAKE_DEBUG(A)

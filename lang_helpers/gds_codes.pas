@@ -2461,6 +2461,12 @@ const
 	gds_fbsvcmgr_fp_empty                = 336986162;
 	isc_fbsvcmgr_bad_arg                 = 336986164;
 	gds_fbsvcmgr_bad_arg                 = 336986164;
+	isc_fbsvcmgr_info_limbo              = 336986170;
+	gds_fbsvcmgr_info_limbo              = 336986170;
+	isc_fbsvcmgr_limbo_state             = 336986171;
+	gds_fbsvcmgr_limbo_state             = 336986171;
+	isc_fbsvcmgr_limbo_advise            = 336986172;
+	gds_fbsvcmgr_limbo_advise            = 336986172;
 	isc_utl_trusted_switch               = 337051649;
 	gds_utl_trusted_switch               = 337051649;
 	isc_nbackup_missing_param            = 337117213;

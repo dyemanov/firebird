@@ -278,7 +278,7 @@ void fbtrace(UtilSvc* uSvc, TraceSvcIntf* traceSvc)
 	const Switches authSwitches(trace_auth_in_sw_table, FB_NELEM(trace_auth_in_sw_table),
 								false, true);
 	string svc_name, user, pwd;
-	bool adminRole = false;
+	bool trusted = false;
 	for (int itr = 1; itr < argc; ++itr)
 	{
 		if (!argv[itr])
@@ -354,7 +354,7 @@ void fbtrace(UtilSvc* uSvc, TraceSvcIntf* traceSvc)
 			if (uSvc->isService())
 				usage(uSvc, isc_trace_switch_user_only, sw->in_sw_name);
 
-			adminRole = true;
+			trusted = true;
 			break;
 
 		case IN_SW_TRACE_SERVICE_NAME:
@@ -400,19 +400,7 @@ void fbtrace(UtilSvc* uSvc, TraceSvcIntf* traceSvc)
 		}
 	}
 
-	AuthReader::AuthBlock authBlock;
-	const unsigned char* bytes;
-	unsigned int authBlockSize = uSvc->getAuthBlock(&bytes);
-	if (authBlockSize)
-	{
-		authBlock.add(bytes, authBlockSize);
-
-		pwd = "";
-		user = "";
-		adminRole = false;
-	}
-
-	traceSvc->setAttachInfo(svc_name, user, pwd, authBlock, adminRole);
+	traceSvc->setAttachInfo(svc_name, user, pwd, trusted);
 
 	switch (action_sw->in_sw)
 	{

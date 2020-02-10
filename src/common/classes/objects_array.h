@@ -381,6 +381,19 @@ namespace Firebird
 			return *this;
 		}
 
+		bool find(const T& item, FB_SIZE_T& pos) const
+		{
+			for (size_type i = 0; i < this->count; i++)
+			{
+				if (*getPointer(i) == item)
+				{
+					pos = i;
+					return true;
+				}
+			}
+			return false;
+		}
+
 	private:
 		void add(const ObjectsArray<T, A>& o)
 		{

@@ -36,7 +36,7 @@ STRIP:=$(CROSS_PREFIX)strip
 
 COMMON_FLAGS=-ggdb -DFB_SEND_FLAGS=MSG_NOSIGNAL -DLINUX -DANDROID -DARM64 -pipe -MMD -fPIC -fmessage-length=0 \
 			 -I$(ROOT)/extern/libtommath --sysroot=$(CROSS_PLATFORM) \
-			 -I$(CROSS_PLATFORM)/usr/include -I$(ROOT)/gen/cross
+			 -I$(CROSS_PLATFORM)/usr/include -I$(ROOT)/gen/cross -fsigned-char
 
 OPTIMIZE_FLAGS=-fno-omit-frame-pointer
 WARN_FLAGS=-Wall -Wno-switch -Wno-parentheses -Wno-unknown-pragmas -Wno-unused-variable
@@ -54,7 +54,7 @@ LINK_LIBS = $(DroidLibs)
 STATICLINK_LIBS = $(DroidLibs)
 SO_LINK_LIBS = $(DroidLibs)
 
-EXE_LINK_OPTIONS= $(LDFLAGS) $(UNDEF_FLAGS) $(LIB_PATH_OPTS) $(LINK_EMPTY_SYMBOLS)
+EXE_LINK_OPTIONS= $(LDFLAGS) $(UNDEF_FLAGS) $(LIB_PATH_OPTS) $(LINK_EMPTY_SYMBOLS) -pie
 LIB_LINK_OPTIONS= $(LDFLAGS) -shared
 
 UNICODE_DIR := $(shell dirname `find /usr/include -name ucnv.h`)

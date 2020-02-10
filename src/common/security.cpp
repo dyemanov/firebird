@@ -27,6 +27,8 @@
 #include "../common/security.h"
 #include "../common/StatusArg.h"
 #include "../utilities/gsec/gsec.h"		// gsec error codes
+#include "../common/db_alias.h"
+
 
 using namespace Firebird;
 
@@ -119,10 +121,9 @@ int setGsecCode(int code, unsigned int operation)
 	return GsecMsg17;
 }
 
-void parseList(ParsedList& parsed, PathName list)
+ParsedList::ParsedList(PathName list)
 {
 	list.alltrim(" \t");
-	parsed.clear();
 	const char* sep = " \t,;";
 
 	for (;;)
@@ -132,33 +133,31 @@ void parseList(ParsedList& parsed, PathName list)
 		{
 			if (list.hasData())
 			{
-				parsed.push(list);
+				this->push(list);
 			}
 			break;
 		}
 
-		parsed.push(list.substr(0, p));
+		this->push(list.substr(0, p));
 		list = list.substr(p + 1);
 		list.ltrim(sep);
 	}
 }
 
-void makeList(PathName& list, const ParsedList& parsed)
+void ParsedList::makeList(PathName& list) const
 {
-	fb_assert(parsed.hasData());
-	list = parsed[0];
-	for (unsigned i = 1; i < parsed.getCount(); ++i)
+	fb_assert(this->hasData());
+	list = (*this)[0];
+	for (unsigned i = 1; i < this->getCount(); ++i)
 	{
 		list += ' ';
-		list += parsed[i];
+		list += (*this)[i];
 	}
 }
 
-void mergeLists(PathName& list, const PathName& serverList, const PathName& clientList)
+void ParsedList::mergeLists(PathName& list, const PathName& serverList, const PathName& clientList)
 {
-	ParsedList onClient, onServer, merged;
-	parseList(onClient, clientList);
-	parseList(onServer, serverList);
+	ParsedList onClient(clientList), onServer(serverList), merged;
 
 	// do not expect too long lists, therefore use double loop
 	for (unsigned c = 0; c < onClient.getCount(); ++c)
@@ -173,7 +172,29 @@ void mergeLists(PathName& list, const PathName& serverList, const PathName& clie
 		}
 	}
 
-	makeList(list, merged);
+	merged.makeList(list);
+}
+
+PathName ParsedList::getNonLoopbackProviders(const PathName& aliasDb)
+{
+	PathName dummy;
+	RefPtr<const Config> config;
+	expandDatabaseName(aliasDb, dummy, &config);
+
+	PathName providers(config->getPlugins(IPluginManager::TYPE_PROVIDER));
+	Auth::ParsedList list(providers);
+	for (unsigned n = 0; n < list.getCount(); ++n)
+	{
+		if (list[n] == "Loopback")
+		{
+			list.remove(n);
+			break;
+		}
+	}
+	list.makeList(providers);
+	providers.insert(0, "Providers=");
+
+	return providers;
 }
 
 } // namespace Auth

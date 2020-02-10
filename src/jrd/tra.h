@@ -252,6 +252,7 @@ public:
 	TraNumber tra_oldest_active;		// record versions older than this can be
 										// gargage-collected by this tx
 	TraNumber tra_att_oldest_active;	// oldest active transaction in the same attachment
+	TraNumber tra_initial_number;		// initial transaction number, not changed by retain context
 	jrd_tra* tra_next;					// next transaction in attachment
 	MemoryPool* const tra_pool;			// pool for transaction
 	Firebird::MemoryStats	tra_memory_stats;

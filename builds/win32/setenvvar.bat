@@ -28,6 +28,14 @@ set FB_PROCESSOR_ARCHITECTURE=%PROCESSOR_ARCHITECTURE%
 
 :: To disable VS8/VS9/VS10 build, slightly alter the env var names in "if" conditions below
 
+if DEFINED VS160COMNTOOLS (
+@devenv /? >nul 2>nul
+@if errorlevel 9009 (call "%VS160COMNTOOLS%\..\..\VC\vcvarsall.bat" %FB_PROCESSOR_ARCHITECTURE%) else ( echo    The file: & @echo      "%VS160COMNTOOLS%\..\..\VC\vcvarsall.bat" %FB_PROCESSOR_ARCHITECTURE% & echo    has already been executed.)
+) else (
+if DEFINED VS150COMNTOOLS (
+@devenv /? >nul 2>nul
+@if errorlevel 9009 (call "%VS150COMNTOOLS%\..\..\VC\vcvarsall.bat" %FB_PROCESSOR_ARCHITECTURE%) else ( echo    The file: & @echo      "%VS150COMNTOOLS%\..\..\VC\vcvarsall.bat" %FB_PROCESSOR_ARCHITECTURE% & echo    has already been executed.)
+) else (
 if DEFINED VS140COMNTOOLS (
 @devenv /? >nul 2>nul
 @if errorlevel 9009 (call "%VS140COMNTOOLS%\..\..\VC\vcvarsall.bat" %FB_PROCESSOR_ARCHITECTURE%) else ( echo    The file: & @echo      "%VS140COMNTOOLS%\..\..\VC\vcvarsall.bat" %FB_PROCESSOR_ARCHITECTURE% & echo    has already been executed.)
@@ -53,6 +61,8 @@ if DEFINED VS71COMNTOOLS (
 @if errorlevel 9009 (call "%VS71COMNTOOLS%vsvars32.bat") else ( echo    The file: & echo      "%VS71COMNTOOLS%vsvars32.bat" & echo    has already been executed.)
 ) else (
 @goto :HELP
+)
+)
 )
 )
 )
@@ -95,9 +105,15 @@ if DEFINED VS71COMNTOOLS (
 
 @if not defined MSVC_VERSION goto :HELP
 
-
 :SET_FB_TARGET_PLATFORM
 @set FB_TARGET_PLATFORM=Win32
+
+:: Use MSVC 14 (VS 2015) project files for VS 2017/2019 tools.
+@if %MSVC_VERSION% GEQ 15 (
+  @set MSVC_VERSION=14
+  @set VS_VER=msvc14
+)
+
 :: If MSVC >= 8 then we can test for processor architecture
 :: We certainly don't want to try and set platform=x64 if MSVC7 is installed
 @if %MSVC_VERSION% GEQ 8 (

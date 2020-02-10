@@ -586,13 +586,13 @@ static void raiseRelationInUseError(const jrd_rel* relation)
 	raiseObjectInUseError(obj_type, obj_name);
 }
 
-static void raiseRoutineInUseError(const Routine* routine)
+static void raiseRoutineInUseError(const Routine* routine, const QualifiedName& name)
 {
 	const string obj_type =
 		(routine->getObjectType() == obj_udf) ? "FUNCTION" : "PROCEDURE";
 	const string obj_name = routine->getName().toString();
 
-	raiseObjectInUseError(obj_type, obj_name);
+	raiseObjectInUseError(obj_type, obj_name.hasData() ? obj_name : name.toString());
 }
 
 static void raiseTooManyVersionsError(const int obj_type, const string& obj_name)
@@ -711,8 +711,6 @@ namespace
 			jrd_tra* transaction)
 		{
 			SET_TDBB(tdbb);
-
-			Jrd::Attachment* attachment = tdbb->getAttachment();
 			const QualifiedName name(work->dfw_name, work->dfw_package);
 			Routine* routine;
 
@@ -744,7 +742,7 @@ namespace
 						if (!LCK_convert(tdbb, routine->existenceLock, LCK_EX,
 								transaction->getLockWait()))
 						{
-							raiseRoutineInUseError(routine);
+							raiseRoutineInUseError(routine, name);
 						}
 					}
 
@@ -763,7 +761,7 @@ namespace
 					// Do not allow to modify routine used by user requests
 					if (routine->isUsed() && MET_routine_in_use(tdbb, routine))
 					{
-						///raiseRoutineInUseError(routine);
+						///raiseRoutineInUseError(routine, name);
 						gds__log("Modifying %s %s which is currently in use by active user requests",
 								 Self::getTypeStr(), name.toString().c_str());
 
@@ -791,7 +789,7 @@ namespace
 					if (routine->getStatement())
 					{
 						if (routine->getStatement()->isActive())
-							raiseRoutineInUseError(routine);
+							raiseRoutineInUseError(routine, name);
 
 						// release the request
 
@@ -832,6 +830,7 @@ namespace
 					{
 						SSHORT validBlr = FALSE;
 
+						Jrd::Attachment* attachment = tdbb->getAttachment();
 						MemoryPool* newPool = attachment->createPool();
 						try
 						{
@@ -862,7 +861,8 @@ namespace
 			jrd_tra* transaction)
 		{
 			SET_TDBB(tdbb);
-			T* routine = NULL;
+			const QualifiedName name(work->dfw_name, work->dfw_package);
+			T* routine;
 
 			switch (phase)
 			{
@@ -891,7 +891,7 @@ namespace
 						if (!LCK_convert(tdbb, routine->existenceLock, LCK_EX,
 								transaction->getLockWait()))
 						{
-							raiseRoutineInUseError(routine);
+							raiseRoutineInUseError(routine, name);
 						}
 					}
 
@@ -910,12 +910,10 @@ namespace
 					if (!routine)
 						return false;
 
-					const QualifiedName name(work->dfw_name, work->dfw_package);
-
 					// Do not allow to drop routine used by user requests
 					if (routine->isUsed() && MET_routine_in_use(tdbb, routine))
 					{
-						///raiseRoutineInUseError(routine);
+						///raiseRoutineInUseError(routine, name);
 						gds__log("Deleting %s %s which is currently in use by active user requests",
 							Self::getTypeStr(), name.toString().c_str());
 
@@ -937,7 +935,7 @@ namespace
 						if (routine->getStatement()->isActive())
 						{
 							routine->flags = old_flags;
-							raiseRoutineInUseError(routine);
+							raiseRoutineInUseError(routine, name);
 						}
 
 						routine->releaseStatement(tdbb);
@@ -1785,7 +1783,7 @@ static bool add_file(thread_db* tdbb, SSHORT phase, DeferredWork* work, jrd_tra*
  *
  **************************************/
 	USHORT section, shadow_number;
-	SLONG start, max;
+	SLONG start, min_start;
 
 	SET_TDBB(tdbb);
 	Database* const dbb = tdbb->getDatabase();
@@ -1807,7 +1805,7 @@ static bool add_file(thread_db* tdbb, SSHORT phase, DeferredWork* work, jrd_tra*
 
 	case 4:
 		CCH_flush(tdbb, FLUSH_FINI, 0);
-		max = PageSpace::maxAlloc(dbb) + 1;
+		start = PageSpace::maxAlloc(dbb) + 1;
 		AutoRequest handle;
 		AutoRequest handle2;
 
@@ -1835,24 +1833,32 @@ static bool add_file(thread_db* tdbb, SSHORT phase, DeferredWork* work, jrd_tra*
 				END_MODIFY
 			}
 
-			// If there is no starting position specified, or if it is
-			// too low a value, make a stab at assigning one based on
-			// the indicated preference for the previous file length.
-
-			if ((start = X.RDB$FILE_START) < max)
+			// Check the previous file length
+			FOR(REQUEST_HANDLE handle2 TRANSACTION_HANDLE transaction)
+				FIRST 1 Y IN RDB$FILES
+					WITH Y.RDB$SHADOW_NUMBER EQ X.RDB$SHADOW_NUMBER
+					AND Y.RDB$FILE_SEQUENCE NOT MISSING
+					SORTED BY DESCENDING Y.RDB$FILE_SEQUENCE
 			{
-				FOR(REQUEST_HANDLE handle2 TRANSACTION_HANDLE transaction)
-					FIRST 1 Y IN RDB$FILES
-						WITH Y.RDB$SHADOW_NUMBER EQ X.RDB$SHADOW_NUMBER
-						AND Y.RDB$FILE_SEQUENCE NOT MISSING
-						SORTED BY DESCENDING Y.RDB$FILE_SEQUENCE
+				if (!Y.RDB$FILE_START.NULL && !Y.RDB$FILE_LENGTH.NULL)
 				{
-					start = Y.RDB$FILE_START + Y.RDB$FILE_LENGTH;
+					min_start = Y.RDB$FILE_START + (Y.RDB$FILE_LENGTH ? Y.RDB$FILE_LENGTH : 1);
+					start = MAX(min_start, start);
 				}
-				END_FOR
+			}
+			END_FOR
+
+			// If there is no starting position specified, or if it is
+			// too low a value, raise the error.
+			if (X.RDB$FILE_START < start)
+			{
+				string error;
+				error.printf("Starting page number for file %s must be %i or greater", X.RDB$FILE_NAME, start);
+				ERR_post(Arg::Gds(isc_random) << error);
 			}
 
-			start = MAX(max, start);
+			start = X.RDB$FILE_START;
+
 			shadow_number = X.RDB$SHADOW_NUMBER;
 			if ((shadow_number &&
 				(section = SDW_add_file(tdbb, X.RDB$FILE_NAME, start, shadow_number))) ||
@@ -3008,6 +3014,34 @@ static void cleanup_index_creation(thread_db* tdbb, DeferredWork* work, jrd_tra*
 				MODIFY IDXN USING
 					IDXN.RDB$INDEX_ID.NULL = TRUE;
 				END_MODIFY
+			}
+
+			if (!IDXN.RDB$FOREIGN_KEY.NULL)
+			{
+				index_desc idx;
+				idx.idx_id = idx_invalid;
+				idx.idx_flags = idx_foreign;
+
+				jrd_rel* partner_relation = NULL;
+				if (MET_lookup_partner(tdbb, relation, &idx, work->dfw_name.c_str()))
+				{
+					partner_relation = MET_lookup_relation_id(tdbb, idx.idx_primary_relation, true);
+				}
+
+				if (partner_relation)
+				{
+					// signal to other processes about new constraint
+					relation->rel_flags |= REL_check_partners;
+					LCK_lock(tdbb, relation->rel_partners_lock, LCK_EX, LCK_WAIT);
+					LCK_release(tdbb, relation->rel_partners_lock);
+
+					if (relation != partner_relation)
+					{
+						partner_relation->rel_flags |= REL_check_partners;
+						LCK_lock(tdbb, partner_relation->rel_partners_lock, LCK_EX, LCK_WAIT);
+						LCK_release(tdbb, partner_relation->rel_partners_lock);
+					}
+				}
 			}
 		}
 	}

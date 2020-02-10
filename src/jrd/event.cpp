@@ -195,7 +195,7 @@ void EventManager::attach_shared_file()
 
 void EventManager::detach_shared_file()
 {
-	delete m_sharedMemory.release();
+	m_sharedMemory.reset();
 }
 
 

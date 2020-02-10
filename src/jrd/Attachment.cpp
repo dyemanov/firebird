@@ -257,9 +257,18 @@ MetaName Jrd::Attachment::nameToMetaCharSet(thread_db* tdbb, const MetaName& nam
 	if (att_charset == CS_METADATA || att_charset == CS_NONE)
 		return name;
 
-	UCHAR buffer[MAX_SQL_IDENTIFIER_SIZE];
-	ULONG len = INTL_convert_bytes(tdbb, CS_METADATA, buffer, MAX_SQL_IDENTIFIER_LEN,
+	UCHAR buffer[MAX_SQL_IDENTIFIER_LEN * 4 + 1];
+	ULONG len = INTL_convert_bytes(tdbb, CS_METADATA, buffer, sizeof(buffer) - 1,
 		att_charset, (const BYTE*) name.c_str(), name.length(), ERR_post);
+
+	if (len > MAX_SQL_IDENTIFIER_LEN)
+	{
+		(Arg::Gds(isc_dsql_error) <<
+			Arg::Gds(isc_sqlerr) << Arg::Num(-104) <<
+			Arg::Gds(isc_dyn_name_longer)
+		).raise();
+	}
+
 	buffer[len] = '\0';
 
 	return MetaName((const char*) buffer);

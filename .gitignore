@@ -11,3 +11,4 @@ config.status
 configure
 libtool
 *.log
+src/dsql/parse.cpp

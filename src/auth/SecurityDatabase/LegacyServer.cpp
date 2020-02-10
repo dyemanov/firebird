@@ -24,25 +24,22 @@
  */
 
 #include "firebird.h"
-#include <string.h>
-#include <stdlib.h>
-#include <time.h>
-#include "../jrd/ibase.h"
-#include "../auth/SecurityDatabase/LegacyServer.h"
-#include "../auth/SecurityDatabase/LegacyHash.h"
-#include "../common/enc_proto.h"
-#include "../jrd/err_proto.h"
-#include "../yvalve/gds_proto.h"
-#include "../common/isc_proto.h"
-#include "../jrd/jrd_proto.h"
-#include "../jrd/scl.h"
-#include "../common/config/config.h"
-#include "../common/classes/objects_array.h"
-#include "../common/classes/init.h"
-#include "../common/classes/ImplementHelper.h"
+
+#include "ibase.h"
+#include "gen/iberror.h"
 #include "firebird/Interface.h"
 
+#include "../auth/SecurityDatabase/LegacyServer.h"
+#include "../auth/SecurityDatabase/LegacyHash.h"
+#include "../auth/SecDbCache.h"
 #include "../remote/remot_proto.h"
+#include "../jrd/constants.h"
+#include "../common/enc_proto.h"
+#include "../jrd/status.h"
+#include "../common/classes/init.h"
+#include "../common/classes/ClumpletWriter.h"
+
+#include <string.h>
 
 #define PLUG_MODULE 1
 
@@ -109,6 +106,8 @@ struct user_record
 	SCHAR password[Auth::MAX_LEGACY_PASSWORD_LENGTH + 2];
 };
 
+typedef char user_name[129];
+
 // Transaction parameter buffer
 
 const UCHAR TPB[4] =
@@ -123,65 +122,50 @@ const UCHAR TPB[4] =
 
 namespace Auth {
 
+GlobalPtr<PluginDatabases> instances;
+
+
 class SecurityDatabaseServer FB_FINAL :
 	public StdPlugin<IServerImpl<SecurityDatabaseServer, CheckStatusWrapper> >
 {
 public:
-	explicit SecurityDatabaseServer(Firebird::IPluginConfig* p)
+	explicit SecurityDatabaseServer(IPluginConfig* p)
 		: iParameter(p)
 	{ }
 
 	// IServer implementation
-	int authenticate(Firebird::CheckStatusWrapper* status, Firebird::IServerBlock* sBlock,
-		Firebird::IWriter* writerInterface);
-	void setDbCryptCallback(Firebird::CheckStatusWrapper*, Firebird::ICryptKeyCallback*) { }	// ignore
+	int authenticate(CheckStatusWrapper* status, IServerBlock* sBlock,
+		IWriter* writerInterface);
+	void setDbCryptCallback(CheckStatusWrapper*, ICryptKeyCallback*) { }	// ignore
 	int release();
 
 private:
-	Firebird::RefPtr<Firebird::IPluginConfig> iParameter;
+	RefPtr<IPluginConfig> iParameter;
 };
 
-class SecurityDatabase FB_FINAL : public RefCntIface<ITimerImpl<SecurityDatabase, CheckStatusWrapper> >
+
+class SecurityDatabase : public VSecDb
 {
 public:
-	int verify(IWriter* authBlock, IServerBlock* sBlock);
+	bool lookup(void* inMsg, void* outMsg);
 
 	// This 2 are needed to satisfy temporarily different calling requirements
 	static int shutdown(const int, const int, void*)
 	{
-		return shutdown();
+		return instances->shutdown();
 	}
 	static void cleanup()
 	{
-		shutdown();
+		instances->shutdown();
 	}
 
-	static int shutdown();
-
-	char secureDbName[MAXPATHLEN];
-
-	SecurityDatabase()
+	SecurityDatabase(const char* secDbName)
 		: lookup_db(0), lookup_req(0)
 	{
-	}
-
-	// ITimer implementation
-	void handler();
-
-	int release()
-	{
-		if (--refCounter == 0)
-		{
-			delete this;
-			return 0;
-		}
-
-		return 1;
+		prepare(secDbName);
 	}
 
 private:
-	Firebird::Mutex mutex;
-
 	ISC_STATUS_ARRAY status;
 
 	isc_db_handle lookup_db;
@@ -189,8 +173,7 @@ private:
 
 	~SecurityDatabase();
 
-	bool lookup_user(const char*, char*);
-	void prepare();
+	void prepare(const char* secDbName);
 	void checkStatus(const char* callName, ISC_STATUS userError = isc_psw_db_error);
 };
 
@@ -219,60 +202,8 @@ SecurityDatabase::~SecurityDatabase()
 	}
 }
 
-bool SecurityDatabase::lookup_user(const char* user_name, char* pwd)
-{
-	bool found = false;		// user found flag
-	char uname[129];		// user name buffer
-	user_record user;		// user record
 
-	// Start by clearing the output data
-
-	if (pwd)
-		*pwd = '\0';
-
-	strncpy(uname, user_name, sizeof uname);
-	uname[sizeof uname - 1] = 0;
-
-	MutexLockGuard guard(mutex, FB_FUNCTION);
-
-	// Attach database and compile request
-
-	prepare();
-
-	// Lookup
-
-	isc_tr_handle lookup_trans = 0;
-
-	isc_start_transaction(status, &lookup_trans, 1, &lookup_db, sizeof(TPB), TPB);
-	checkStatus("isc_start_transaction", isc_psw_start_trans);
-
-	isc_start_and_send(status, &lookup_req, &lookup_trans, 0, sizeof(uname), uname, 0);
-	checkStatus("isc_start_and_send");
-
-	while (true)
-	{
-		isc_receive(status, &lookup_req, 1, sizeof(user), &user, 0);
-		checkStatus("isc_receive");
-
-		if (!user.flag || status[1])
-			break;
-
-		found = true;
-
-		if (pwd)
-		{
-			strncpy(pwd, user.password, MAX_LEGACY_PASSWORD_LENGTH);
-			pwd[MAX_LEGACY_PASSWORD_LENGTH] = 0;
-		}
-	}
-
-	isc_rollback_transaction(status, &lookup_trans);
-	checkStatus("isc_rollback_transaction");
-
-	return found;
-}
-
-void SecurityDatabase::prepare()
+void SecurityDatabase::prepare(const char* secureDbName)
 {
 	if (lookup_db)
 	{
@@ -294,8 +225,8 @@ void SecurityDatabase::prepare()
 	// Attach as SYSDBA
 	dpb.insertString(isc_dpb_trusted_auth, SYSDBA_USER_NAME, fb_strlen(SYSDBA_USER_NAME));
 
-	// Do not use other providers except current engine
-	dpb.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
+	// Do not use loopback provider
+	dpb.insertString(isc_dpb_config, ParsedList::getNonLoopbackProviders(secureDbName));
 
 	isc_db_handle tempHandle = 0;
 	isc_attach_database(status, 0, secureDbName, &tempHandle,
@@ -313,74 +244,6 @@ void SecurityDatabase::prepare()
 	}
 
 	checkStatus("isc_compile_request", isc_psw_attach);
-}
-
-/******************************************************************************
- *
- *	Public interface
- */
-
-int SecurityDatabase::verify(IWriter* authBlock, IServerBlock* sBlock)
-{
-	const char* user = sBlock->getLogin();
-	string login(user ? user : "");
-
-	unsigned length;
-	const unsigned char* data = sBlock->getData(&length);
-	string passwordEnc;
-	if (data)
-	{
-		passwordEnc.assign(data, length);
-	}
-
-	if (!login.hasData())
-	{
-		return IAuth::AUTH_CONTINUE;
-	}
-	if (!passwordEnc.hasData())
-	{
-		return IAuth::AUTH_MORE_DATA;
-	}
-
-	// Look up the user name in the userinfo database and use the parameters
-	// found there. This means that another database must be accessed, and
-	// that means the current context must be saved and restored.
-
-	char pw1[MAX_LEGACY_PASSWORD_LENGTH + 1];
-	if (!lookup_user(login.c_str(), pw1))
-	{
-		return IAuth::AUTH_CONTINUE;
-	}
-	pw1[MAX_LEGACY_PASSWORD_LENGTH] = 0;
-	string storedHash(pw1, MAX_LEGACY_PASSWORD_LENGTH);
-	storedHash.rtrim();
-
-	string newHash;
-	LegacyHash::hash(newHash, login, passwordEnc, storedHash);
-	if (newHash != storedHash)
-	{
-		bool legacyHash = Config::getLegacyHash();
-		if (legacyHash)
-		{
-			newHash.resize(MAX_LEGACY_PASSWORD_LENGTH + 2);
-			ENC_crypt(newHash.begin(), newHash.length(), passwordEnc.c_str(), LEGACY_PASSWORD_SALT);
-			newHash.recalculate_length();
-			newHash.erase(0, 2);
-			legacyHash = newHash == storedHash;
-		}
-		if (!legacyHash)
-		{
-			return IAuth::AUTH_CONTINUE;
-		}
-	}
-
-	LocalStatus ls;
-	CheckStatusWrapper s(&ls);
-	authBlock->add(&s, login.c_str());
-	check(&s);
-	authBlock->setDb(&s, secureDbName);
-	check(&s);
-	return IAuth::AUTH_SUCCESS;
 }
 
 void SecurityDatabase::checkStatus(const char* callName, ISC_STATUS userError)
@@ -402,143 +265,136 @@ void SecurityDatabase::checkStatus(const char* callName, ISC_STATUS userError)
 	secDbError.raise();
 }
 
-typedef HalfStaticArray<SecurityDatabase*, 4> InstancesArray;
-GlobalPtr<InstancesArray> instances;
-GlobalPtr<Mutex> instancesMutex;
-
-void SecurityDatabase::handler()
+bool SecurityDatabase::lookup(void* inMsg, void* outMsg)
 {
-	try
-	{
-		MutexLockGuard g(instancesMutex, FB_FUNCTION);
+	isc_tr_handle lookup_trans = 0;
 
-		InstancesArray& curInstances(instances);
-		for (unsigned int i = 0; i < curInstances.getCount(); ++i)
-		{
-			if (curInstances[i] == this)
-			{
-				curInstances.remove(i);
-				release();
-				break;
-			}
-		}
-	}
-	catch (Exception &ex)
+	isc_start_transaction(status, &lookup_trans, 1, &lookup_db, sizeof(TPB), TPB);
+	checkStatus("isc_start_transaction", isc_psw_start_trans);
+
+	isc_start_and_send(status, &lookup_req, &lookup_trans, 0, sizeof(user_name), inMsg, 0);
+	checkStatus("isc_start_and_send");
+
+	bool found = false;
+	while (true)
 	{
- 		StaticStatusVector st;
- 		ex.stuffException(st);
-		const ISC_STATUS* status = st.begin();
-		if (status[0] == 1 && status[1] != isc_att_shutdown)
-		{
-			iscLogStatus("Legacy security database timer handler", status);
-		}
+		user_record* user = static_cast<user_record*>(outMsg);
+		isc_receive(status, &lookup_req, 1, sizeof(user_record), user, 0);
+		checkStatus("isc_receive");
+
+		if (!user->flag || status[1])
+			break;
+
+		found = true;
 	}
+
+	isc_rollback_transaction(status, &lookup_trans);
+	checkStatus("isc_rollback_transaction");
+
+	return found;
 }
 
-int SecurityDatabase::shutdown()
-{
-	try
-	{
-		MutexLockGuard g(instancesMutex, FB_FUNCTION);
-		InstancesArray& curInstances(instances);
-		for (unsigned int i = 0; i < curInstances.getCount(); ++i)
-		{
-			if (curInstances[i])
-			{
-				LocalStatus ls;
-				CheckStatusWrapper s(&ls);
-				TimerInterfacePtr()->stop(&s, curInstances[i]);
-				check(&s);
-				curInstances[i]->release();
-				curInstances[i] = NULL;
-			}
-		}
-		curInstances.clear();
-	}
-	catch (Exception &ex)
-	{
- 		StaticStatusVector st;
- 		ex.stuffException(st);
-		const ISC_STATUS* status = st.begin();
-		if (status[0] == 1 && status[1] != isc_att_shutdown)
-		{
-			iscLogStatus("Legacy security database shutdown", status);
-		}
 
-		return FB_FAILURE;
-	}
+/******************************************************************************
+ *
+ *	Public interface
+ */
 
-	return FB_SUCCESS;
-}
-
-const static unsigned int INIT_KEY = ((~0) - 1);
-static unsigned int secDbKey = INIT_KEY;
-
-int SecurityDatabaseServer::authenticate(Firebird::CheckStatusWrapper* status, IServerBlock* sBlock,
-	IWriter* writerInterface)
+int SecurityDatabaseServer::authenticate(CheckStatusWrapper* status, IServerBlock* sBlock,
+	IWriter* authBlock)
 {
 	status->init();
 
 	try
 	{
-		PathName secDbName;
-		{ // config scope
-			LocalStatus ls;
-			CheckStatusWrapper s(&ls);
-			RefPtr<IFirebirdConf> config(REF_NO_INCR, iParameter->getFirebirdConf(&s));
-			check(&s);
+		const char* user = sBlock->getLogin();
+		if (!user)
+		{
+			HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer (nologin) %d\n", IAuth::AUTH_CONTINUE));
+			return IAuth::AUTH_CONTINUE;
+		}
+		string login(user);
 
-			if (secDbKey == INIT_KEY)
-			{
-				secDbKey = config->getKey("SecurityDatabase");
-			}
-			const char* tmp = config->asString(secDbKey);
-			if (!tmp)
-			{
-				Arg::Gds(isc_secdb_name).raise();
-			}
-
-			secDbName = tmp;
+		unsigned length;
+		const unsigned char* data = sBlock->getData(&length);
+		if (!(data && length))
+		{
+			HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer (nopw) %d\n", IAuth::AUTH_MORE_DATA));
+			return IAuth::AUTH_MORE_DATA;
 		}
 
-		RefPtr<SecurityDatabase> instance;
+		bool found = false;
+		char pw1[MAX_LEGACY_PASSWORD_LENGTH + 1];
+		PathName secureDbName;
+		{ // reference & mutex scope scope
+			// Get database block from cache
+			RefPtr<CachedSecurityDatabase> instance;
+			instances->getInstance(iParameter, instance);
 
-		{ // guard scope
-			MutexLockGuard g(instancesMutex, FB_FUNCTION);
-			InstancesArray& curInstances(instances);
-			for (unsigned int i = 0; i < curInstances.getCount(); ++i)
+			try
 			{
-				if (secDbName == curInstances[i]->secureDbName)
-				{
-					instance = curInstances[i];
-					break;
-				}
+				MutexLockGuard g(instance->mutex, FB_FUNCTION);
+
+				secureDbName = instance->secureDbName;
+				if (!instance->secDb)
+					instance->secDb = FB_NEW SecurityDatabase(instance->secureDbName);
+
+				user_name uname;		// user name buffer
+				login.copyTo(uname, sizeof uname);
+				user_record user_block;		// user record
+				found = instance->secDb->lookup(uname, &user_block);
+				fb_utils::copy_terminate(pw1, user_block.password, MAX_LEGACY_PASSWORD_LENGTH + 1);
+			}
+			catch(const Exception&)
+			{
+				instance->close();
+				throw;
 			}
 
-			if (!instance)
+			instance->close();
+		}
+		if (!found)
+		{
+			HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer (badlogin) %d\n", IAuth::AUTH_CONTINUE));
+			return IAuth::AUTH_CONTINUE;
+		}
+
+		string storedHash(pw1, MAX_LEGACY_PASSWORD_LENGTH);
+		storedHash.rtrim();
+		storedHash.recalculate_length();
+
+		string passwordEnc;
+		passwordEnc.assign(data, length);
+
+		string newHash;
+		LegacyHash::hash(newHash, login, passwordEnc, storedHash);
+		if (newHash != storedHash)
+		{
+			bool legacyHash = Config::getLegacyHash();
+			if (legacyHash)
 			{
-				instance = FB_NEW SecurityDatabase;
-				instance->addRef();
-				secDbName.copyTo(instance->secureDbName, sizeof(instance->secureDbName));
-				curInstances.add(instance);
+				newHash.resize(MAX_LEGACY_PASSWORD_LENGTH + 2);
+				ENC_crypt(newHash.begin(), newHash.length(), passwordEnc.c_str(), LEGACY_PASSWORD_SALT);
+				newHash.recalculate_length();
+				newHash.erase(0, 2);
+				legacyHash = newHash == storedHash;
+			}
+			if (!legacyHash)
+			{
+				HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer (badpw) %d\n", IAuth::AUTH_CONTINUE));
+				return IAuth::AUTH_CONTINUE;
 			}
 		}
 
-		int rc = instance->verify(writerInterface, sBlock);
-#define USE_ATT_RQ_CACHE
-#ifdef USE_ATT_RQ_CACHE
-		LocalStatus ls;
-		CheckStatusWrapper s(&ls);
-		TimerInterfacePtr()->start(&s, instance, 10 * 1000 * 1000);
-		if (s.getState() & IStatus::STATE_ERRORS)
-			instance->handler();
-#else
-		instance->handler();
-#endif
-		HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer: verify=%d\n", rc));
-		return rc;
+		Jrd::FbLocalStatus s;
+		authBlock->add(&s, login.c_str());
+		check(&s);
+		authBlock->setDb(&s, secureDbName.c_str());
+		check(&s);
+		HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer (OK) %d\n", IAuth::AUTH_SUCCESS));
+		return IAuth::AUTH_SUCCESS;
 	}
-	catch (const Firebird::Exception& ex)
+	catch (const Exception& ex)
 	{
 		ex.stuffException(status);
 		HANDSHAKE_DEBUG(fprintf(stderr, "LegacyServer: exception status:\n"));
@@ -560,12 +416,12 @@ int SecurityDatabaseServer::release()
 }
 
 namespace {
-	Firebird::SimpleFactory<SecurityDatabaseServer> factory;
+	SimpleFactory<SecurityDatabaseServer> factory;
 }
 
-void registerLegacyServer(Firebird::IPluginManager* iPlugin)
+void registerLegacyServer(IPluginManager* iPlugin)
 {
-	iPlugin->registerPluginFactory(Firebird::IPluginManager::TYPE_AUTH_SERVER,
+	iPlugin->registerPluginFactory(IPluginManager::TYPE_AUTH_SERVER,
 		"Legacy_Auth", &factory);
 }
 

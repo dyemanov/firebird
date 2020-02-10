@@ -1473,11 +1473,7 @@ void logAndDie(const char* text)
 {
 	gds__log(text);
 	Firebird::Syslog::Record(Firebird::Syslog::Error, text);
-#ifdef WIN_NT
-	exit(3);
-#else
 	abort();
-#endif
 }
 
 unsigned sqlTypeToDsc(unsigned runOffset, unsigned sqlType, unsigned sqlLength,
@@ -1644,6 +1640,11 @@ const char* dpbItemUpper(const char* s, FB_SIZE_T l, Firebird::string& buf)
 	}
 
 	return buf.c_str();
+}
+
+FbShutdown::~FbShutdown()
+{
+	fb_shutdown(0, reason);
 }
 
 } // namespace fb_utils

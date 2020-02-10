@@ -111,9 +111,10 @@ static ULONG get_size(const SCHAR*, burp_fil*);
 static gbak_action open_files(const TEXT *, const TEXT**, USHORT,
 							  const Firebird::ClumpletWriter&);
 static int svc_api_gbak(Firebird::UtilSvc*, const Switches& switches);
-static void burp_output(bool err, const SCHAR*, ...) ATTRIBUTE_FORMAT(2,3);
 static void burp_usage(const Switches& switches);
 static Switches::in_sw_tab_t* findSwitchOrThrow(Firebird::UtilSvc*, Switches& switches, Firebird::string& sw);
+static void processFetchPass(const SCHAR*& password, int& itr, const int argc, Firebird::UtilSvc::ArgvType& argv);
+
 
 // fil.fil_length is FB_UINT64
 const ULONG KBYTE	= 1024;
@@ -180,6 +181,7 @@ static int svc_api_gbak(Firebird::UtilSvc* uSvc, const Switches& switches)
  *
  **********************************************/
     Firebird::string usr, pswd, service;
+    const SCHAR* pswd2 = NULL;
 	bool flag_restore = false;
 	bool flag_verbose = false;
 #ifdef TRUSTED_AUTH
@@ -233,6 +235,7 @@ static int svc_api_gbak(Firebird::UtilSvc* uSvc, const Switches& switches)
 					break;
 				case IN_SW_BURP_PASS:			// default password
 					pswd = argv[itr];
+					pswd2 = pswd.nullStr();
 					uSvc->hidePasswd(argv, itr);
 					break;
 				case IN_SW_BURP_SE:				// service name
@@ -241,6 +244,12 @@ static int svc_api_gbak(Firebird::UtilSvc* uSvc, const Switches& switches)
 				}
 				argv[itr] = 0;
 			}
+			break;
+		case IN_SW_BURP_FETCHPASS:
+			argv[itr] = 0;
+			processFetchPass(pswd2, itr, argc, argv);
+			pswd = pswd2;
+			argv[itr] = 0;
 			break;
 		case IN_SW_BURP_V:				// verify actions
 			if (flag_verbint)
@@ -392,7 +401,7 @@ static int svc_api_gbak(Firebird::UtilSvc* uSvc, const Switches& switches)
 
 				fb_assert(p + len < respbuf + sizeof(respbuf));
 				p[len] = '\0';
-				burp_output(false, "%s\n", p);
+				BURP_output(false, "%s\n", p);
 			}
 		} while (*sl == isc_info_svc_line);
 
@@ -672,33 +681,7 @@ int gbak(Firebird::UtilSvc* uSvc)
 			tdgbl->gbl_sw_password = argv[itr];
 			break;
 		case IN_SW_BURP_FETCHPASS:
-			if (++itr >= argc)
-			{
-				BURP_error(189, true);
-				// password parameter missing
-			}
-			if (tdgbl->gbl_sw_password)
-			{
-				BURP_error(307, true);
-				// too many passwords provided
-			}
-			switch (fb_utils::fetchPassword(argv[itr], tdgbl->gbl_sw_password))
-			{
-			case fb_utils::FETCH_PASS_OK:
-				break;
-			case fb_utils::FETCH_PASS_FILE_OPEN_ERROR:
-				BURP_error(308, true, MsgFormat::SafeArg() << argv[itr] << errno);
-				// error @2 opening password file @1
-				break;
-			case fb_utils::FETCH_PASS_FILE_READ_ERROR:
-				BURP_error(309, true, MsgFormat::SafeArg() << argv[itr] << errno);
-				// error @2 reading password file @1
-				break;
-			case fb_utils::FETCH_PASS_FILE_EMPTY:
-				BURP_error(310, true, MsgFormat::SafeArg() << argv[itr]);
-				// password file @1 is empty
-				break;
-			}
+			processFetchPass(tdgbl->gbl_sw_password, itr, argc, argv);
 			break;
 		case IN_SW_BURP_USER:
 			if (++itr >= argc)
@@ -796,16 +779,14 @@ int gbak(Firebird::UtilSvc* uSvc)
 					FILE* tmp_outfile = os_utils::fopen(redirect, fopen_read_type);
 					if (tmp_outfile)
 					{
-						BURP_print(true, 66, redirect);
-						// msg 66 can't open status and error output file %s
 						fclose(tmp_outfile);
-						BURP_exit_local(FINI_ERROR, tdgbl);
+						BURP_error(66, true, SafeArg() << redirect);
+						// msg 66 can't open status and error output file %s
 					}
 					if (! (tdgbl->output_file = os_utils::fopen(redirect, fopen_write_type)))
 					{
-						BURP_print(true, 66, redirect);
+						BURP_error(66, true, SafeArg() << redirect);
 						// msg 66 can't open status and error output file %s
-						BURP_exit_local(FINI_ERROR, tdgbl);
 					}
 				}
 			}
@@ -1472,7 +1453,7 @@ void BURP_msg_partial(bool err, USHORT number, const SafeArg& arg)
 	TEXT buffer[256];
 
 	fb_msg_format(NULL, burp_msg_fac, number, sizeof(buffer), buffer, arg);
-	burp_output(err, "%s", buffer);
+	BURP_output(err, "%s", buffer);
 }
 
 
@@ -1491,7 +1472,7 @@ void BURP_msg_put(bool err, USHORT number, const SafeArg& arg)
 	TEXT buffer[256];
 
 	fb_msg_format(NULL, burp_msg_fac, number, sizeof(buffer), buffer, arg);
-	burp_output(err, "%s\n", buffer);
+	BURP_output(err, "%s\n", buffer);
 }
 
 
@@ -1529,7 +1510,7 @@ void BURP_output_version(void* arg1, const TEXT* arg2)
  *
  **************************************/
 
-	burp_output(false, static_cast<const char*>(arg1), arg2);
+	BURP_output(false, static_cast<const char*>(arg1), arg2);
 }
 
 
@@ -1607,12 +1588,12 @@ void BURP_print_status(bool err, const ISC_STATUS* status_vector)
 		if (fb_interpret(s, sizeof(s), &vector))
 		{
 			BURP_msg_partial(err, 256); // msg 256: gbak: ERROR:
-			burp_output(err, "%s\n", s);
+			BURP_output(err, "%s\n", s);
 
 			while (fb_interpret(s, sizeof(s), &vector))
 			{
 				BURP_msg_partial(err, 256); // msg 256: gbak: ERROR:
-				burp_output(err, "    %s\n", s);
+				BURP_output(err, "    %s\n", s);
 			}
 		}
 	}
@@ -1645,12 +1626,12 @@ void BURP_print_warning(const ISC_STATUS* status_vector)
 		if (fb_interpret(s, sizeof(s), &vector))
 		{
 			BURP_msg_partial(false, 255); // msg 255: gbak: WARNING:
-			burp_output(false, "%s\n", s);
+			BURP_output(false, "%s\n", s);
 
 			while (fb_interpret(s, sizeof(s), &vector))
 			{
 				BURP_msg_partial(false, 255); // msg 255: gbak: WARNING:
-				burp_output(false, "    %s\n", s);
+				BURP_output(false, "    %s\n", s);
 			}
 		}
 	}
@@ -1681,7 +1662,7 @@ void BURP_verbose(USHORT number, const SafeArg& arg)
 		BURP_msg_put(false, number, arg);
 	}
 	else
-		burp_output(false, "%s", "");
+		BURP_output(false, "%s", "");
 }
 
 
@@ -1709,7 +1690,7 @@ void BURP_verbose(USHORT number, const char* str)
 		BURP_msg_put(false, number, SafeArg() << str);
 	}
 	else
-		burp_output(false, "%s", "");
+		BURP_output(false, "%s", "");
 }
 
 
@@ -2195,7 +2176,7 @@ static gbak_action open_files(const TEXT* file1,
 }
 
 
-static void burp_output(bool err, const SCHAR* format, ...)
+void BURP_output(bool err, const SCHAR* format, ...)
 {
 /**************************************
  *
@@ -2504,7 +2485,7 @@ void BurpGlobals::print_stats(USHORT number)
 	const bool total = (number == 369);
 	// msg 369 total statistics
 
-	burp_output(false, " ");
+	BURP_output(false, " ");
 
 	const int time_mask = (1 << TIME_TOTAL) | (1 << TIME_DELTA);
 	if (gbl_stat_flags & time_mask)
@@ -2515,13 +2496,13 @@ void BurpGlobals::print_stats(USHORT number)
 		if (gbl_stat_flags & (1 << TIME_TOTAL))
 		{
 			SINT64 t1 = (t0 - gbl_stats[TIME_TOTAL]) / freq_ms;
-			burp_output(false, STAT_FORMATS[TIME_TOTAL].format, (int)(t1 / 1000), (int)(t1 % 1000));
+			BURP_output(false, STAT_FORMATS[TIME_TOTAL].format, (int)(t1 / 1000), (int)(t1 % 1000));
 		}
 
 		if (gbl_stat_flags & (1 << TIME_DELTA))
 		{
 			SINT64 t2 = (t0 - gbl_stats[TIME_DELTA]) / freq_ms;
-			burp_output(false, STAT_FORMATS[TIME_DELTA].format, (int)(t2 / 1000), (int)(t2 % 1000));
+			BURP_output(false, STAT_FORMATS[TIME_DELTA].format, (int)(t2 / 1000), (int)(t2 % 1000));
 
 			gbl_stats[TIME_DELTA] = t0;
 		}
@@ -2543,7 +2524,7 @@ void BurpGlobals::print_stats(USHORT number)
 
 			gbl_stats[i] = cur_stats[i];
 
-			burp_output(false, STAT_FORMATS[i].format, val);
+			BURP_output(false, STAT_FORMATS[i].format, val);
 		}
 	}
 
@@ -2559,15 +2540,15 @@ void BurpGlobals::print_stats_header()
 	gbl_stat_header = true;
 
 	BURP_msg_partial(false, 169);	// msg 169: gbak:
-	burp_output(false, " ");
+	BURP_output(false, " ");
 
 	for (int i = 0; i < LAST_COUNTER; i++)
 	{
 		if (gbl_stat_flags & (1 << i))
-			burp_output(false, "%-*s", STAT_FORMATS[i].width, STAT_FORMATS[i].header);
+			BURP_output(false, "%-*s", STAT_FORMATS[i].width, STAT_FORMATS[i].header);
 	}
 
-	burp_output(false, "\n");
+	BURP_output(false, "\n");
 }
 
 UnicodeCollationHolder::UnicodeCollationHolder(MemoryPool& pool)
@@ -2601,4 +2582,36 @@ UnicodeCollationHolder::~UnicodeCollationHolder()
 
 	// cs should be deleted by texttype_fn_destroy call above
 	delete tt;
+}
+
+static void processFetchPass(const SCHAR*& password, int& itr, const int argc, Firebird::UtilSvc::ArgvType& argv)
+{
+	if (++itr >= argc)
+	{
+		BURP_error(189, true);
+		// password parameter missing
+	}
+	if (password)
+	{
+		BURP_error(307, true);
+		// too many passwords provided
+	}
+
+	switch (fb_utils::fetchPassword(argv[itr], password))
+	{
+	case fb_utils::FETCH_PASS_OK:
+		break;
+	case fb_utils::FETCH_PASS_FILE_OPEN_ERROR:
+		BURP_error(308, true, MsgFormat::SafeArg() << argv[itr] << errno);
+		// error @2 opening password file @1
+		break;
+	case fb_utils::FETCH_PASS_FILE_READ_ERROR:
+		BURP_error(309, true, MsgFormat::SafeArg() << argv[itr] << errno);
+		// error @2 reading password file @1
+		break;
+	case fb_utils::FETCH_PASS_FILE_EMPTY:
+		BURP_error(310, true, MsgFormat::SafeArg() << argv[itr]);
+		// password file @1 is empty
+		break;
+	}
 }

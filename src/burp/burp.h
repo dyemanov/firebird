@@ -100,7 +100,8 @@ enum rec_type {
 	rec_collation,			// Collations
 	rec_sql_roles,			// SQL roles
 	rec_mapping,			// Mapping of security names
-	rec_package				// Package
+	rec_package,			// Package
+	rec_db_creator			// Database creator
 };
 
 
@@ -601,7 +602,11 @@ enum att_type {
 	att_package_valid_body_flag,
 	att_package_security_class,
 	att_package_owner_name,
-	att_package_description
+	att_package_description,
+
+	// Database creators
+	att_dbc_user = SERIES,
+	att_dbc_type
 };
 
 
@@ -1044,10 +1049,12 @@ public:
 	isc_req_handle	handles_get_security_class_req_handle1;
 	isc_req_handle	handles_get_sql_roles_req_handle1;
 	isc_req_handle	handles_get_mapping_req_handle1;
+	isc_req_handle	handles_db_creators_req_handle1;
 	isc_req_handle	handles_get_trigger_message_req_handle1;
 	isc_req_handle	handles_get_trigger_message_req_handle2;
 	isc_req_handle	handles_get_trigger_old_req_handle1;
 	isc_req_handle	handles_get_trigger_req_handle1;
+	isc_req_handle	handles_get_trigger_req_handle2;
 	isc_req_handle	handles_get_type_req_handle1;
 	isc_req_handle	handles_get_user_privilege_req_handle1;
 	isc_req_handle	handles_get_view_req_handle1;
@@ -1093,6 +1100,7 @@ public:
 	ULONG verboseInterval;	// How many records should be backed up or restored before we show this message
 	bool flag_on_line;		// indicates whether we will bring the database on-line
 	bool firstMap;			// this is the first time we entered get_mapping()
+	bool firstDbc;			// this is the first time we entered get_db_creators()
 	bool stdIoMode;			// stdin or stdout is used as backup file
 	Firebird::AutoPtr<UnicodeCollationHolder> unicodeCollation;
 	Firebird::AutoPtr<Firebird::SimilarToMatcher<UCHAR, Jrd::UpcaseConverter<> > > skipDataMatcher;

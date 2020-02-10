@@ -323,12 +323,12 @@ AssignmentNode* AssignmentNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 	dsqlValidateTarget(node->asgnTo);
 
 	// Try to force asgnFrom to be same type as asgnTo eg: ? = FIELD case
-	PASS1_set_parameter_type(dsqlScratch, node->asgnFrom, node->asgnTo, false);
+	PASS1_set_parameter_type(dsqlScratch, node->asgnFrom, NULL, node->asgnTo, false);
 
 	// Try to force asgnTo to be same type as asgnFrom eg: FIELD = ? case
 	// Try even when the above call succeeded, because "asgnTo" may
 	// have sub-expressions that should be resolved.
-	PASS1_set_parameter_type(dsqlScratch, node->asgnTo, node->asgnFrom, false);
+	PASS1_set_parameter_type(dsqlScratch, node->asgnTo, NULL, node->asgnFrom, false);
 
 	return node;
 }
@@ -2705,7 +2705,7 @@ ExecProcedureNode* ExecProcedureNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 			DEV_BLKCHK(field, dsql_type_fld);
 			DEV_BLKCHK(*ptr, dsql_type_nod);
 			MAKE_desc_from_field(&desc_node, field);
-			PASS1_set_parameter_type(dsqlScratch, *ptr, &desc_node, false);
+			PASS1_set_parameter_type(dsqlScratch, *ptr, &desc_node, NULL, false);
 		}
 	}
 
@@ -3951,7 +3951,7 @@ ExecBlockNode* ExecBlockNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 
 			newParam->type->flags |= FLD_nullable;
 			MAKE_desc_from_field(&desc_node, newParam->type);
-			PASS1_set_parameter_type(dsqlScratch, temp, &desc_node, false);
+			PASS1_set_parameter_type(dsqlScratch, temp, &desc_node, NULL, false);
 		} // end scope
 
 		if (param != parameters.begin())
@@ -5260,8 +5260,8 @@ StmtNode* MergeNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 
 			for (FB_SIZE_T i = 0; i < assignStatements->statements.getCount(); ++i)
 			{
-				if (!PASS1_set_parameter_type(dsqlScratch, orgValues[i], newValues[i], false))
-					PASS1_set_parameter_type(dsqlScratch, newValues[i], orgValues[i], false);
+				if (!PASS1_set_parameter_type(dsqlScratch, orgValues[i], NULL, newValues[i], false))
+					PASS1_set_parameter_type(dsqlScratch, newValues[i], NULL, orgValues[i], false);
 
 				AssignmentNode* assign = FB_NEW_POOL(pool) AssignmentNode(pool);
 				assign->asgnFrom = orgValues[i];
@@ -5797,8 +5797,8 @@ StmtNode* ModifyNode::internalDsqlPass(DsqlCompilerScratch* dsqlScratch, bool up
 		ValueExprNode* const sub1 = orgValues[j];
 		ValueExprNode* const sub2 = newValues[j];
 
-		if (!PASS1_set_parameter_type(dsqlScratch, sub1, sub2, false))
-			PASS1_set_parameter_type(dsqlScratch, sub2, sub1, false);
+		if (!PASS1_set_parameter_type(dsqlScratch, sub1, NULL, sub2, false))
+			PASS1_set_parameter_type(dsqlScratch, sub2, NULL, sub1, false);
 
 		AssignmentNode* assign = FB_NEW_POOL(pool) AssignmentNode(pool);
 		assign->asgnFrom = sub1;
@@ -6569,7 +6569,7 @@ StmtNode* StoreNode::internalDsqlPass(DsqlCompilerScratch* dsqlScratch, bool upd
 			temp->asgnTo = *ptr;
 			assignStatements->statements.add(temp);
 
-			PASS1_set_parameter_type(dsqlScratch, *ptr2, temp->asgnTo, false);
+			PASS1_set_parameter_type(dsqlScratch, *ptr2, NULL, temp->asgnTo, false);
 		}
 	}
 

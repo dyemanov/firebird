@@ -43,6 +43,7 @@ public:
 		m_commit(commit),
 		m_retain(retain),
 		m_transaction(transaction),
+		m_prevID(transaction->tra_number),
 		m_baseline(NULL)
 	{
 		Attachment* attachment = m_transaction->tra_attachment;
@@ -73,7 +74,7 @@ public:
 			fb_utils::query_performance_counter() - m_start_clock, 0);
 
 		TraceConnectionImpl conn(attachment);
-		TraceTransactionImpl tran(m_transaction, stats.getPerf());
+		TraceTransactionImpl tran(m_transaction, stats.getPerf(), m_prevID);
 
 		attachment->att_trace_manager->event_transaction_end(&conn, &tran, m_commit, m_retain, result);
 		m_baseline = NULL;
@@ -84,6 +85,7 @@ private:
 	const bool m_commit;
 	const bool m_retain;
 	jrd_tra* const m_transaction;
+	const ISC_INT64 m_prevID;
 	SINT64 m_start_clock;
 	Firebird::AutoPtr<RuntimeStatistics> m_baseline;
 };

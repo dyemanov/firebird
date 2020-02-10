@@ -194,20 +194,11 @@ public:
 		if (dsqlScratch)
 			dsqlScratch->setTransaction(transaction);
 
-		try
-		{
-			if (checkPermission(tdbb, transaction))
-				tdbb->tdbb_flags |= TDBB_trusted_ddl;
+		const USHORT flag = checkPermission(tdbb, transaction) ? TDBB_trusted_ddl : 0;
 
-			execute(tdbb, dsqlScratch, transaction);
-		}
-		catch (...)
-		{
-			tdbb->tdbb_flags &= ~TDBB_trusted_ddl;
-			throw;
-		}
+		Firebird::AutoSetRestoreFlag<USHORT> trustedDdlFlag(&tdbb->tdbb_flags, flag, true);
 
-		tdbb->tdbb_flags &= ~TDBB_trusted_ddl;
+		execute(tdbb, dsqlScratch, transaction);
 	}
 
 	virtual DdlNode* dsqlPass(DsqlCompilerScratch* dsqlScratch)
@@ -783,7 +774,7 @@ public:
 	}
 
 	virtual bool setParameterType(DsqlCompilerScratch* /*dsqlScratch*/,
-		const dsc* /*desc*/, bool /*forceVarChar*/)
+		const dsc* /*desc*/, ValueExprNode* /*node*/, bool /*forceVarChar*/)
 	{
 		return false;
 	}

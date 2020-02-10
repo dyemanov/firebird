@@ -349,19 +349,15 @@ public:
 			timerHolder.init();
 
 			TimerEntry* curTimer = getTimer(timer);
-			if (!curTimer)
-			{
-				TimerEntry newTimer;
-
-				newTimer.timer = timer;
-				newTimer.fireTime = curTime() + microSeconds;
-				timerQueue->add(newTimer);
-				timer->addRef();
-			}
+			if (curTimer)
+				timerQueue->remove(curTimer);
 			else
-			{
-				curTimer->fireTime = curTime() + microSeconds;
-			}
+				timer->addRef();
+			
+			TimerEntry newTimer;
+			newTimer.timer = timer;
+			newTimer.fireTime = curTime() + microSeconds;
+			timerQueue->add(newTimer);
 
 			timerWakeup->release();
 		}

@@ -222,9 +222,6 @@
 /* Define to 1 if you have the <langinfo.h> header file. */
 #cmakedefine HAVE_LANGINFO_H 1
 
-/* Define to 1 if you have the <libio.h> header file. */
-#cmakedefine HAVE_LIBIO_H 1
-
 /* Define to 1 if you have the <linux/falloc.h> header file. */
 #cmakedefine HAVE_LINUX_FALLOC_H 1
 

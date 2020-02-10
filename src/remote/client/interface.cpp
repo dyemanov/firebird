@@ -5291,7 +5291,7 @@ static void add_other_params(rem_port* port, ClumpletWriter& dpb, const Paramete
 			if (!dpb.find(isc_dpb_utf8_filename))
 				ISC_utf8ToSystem(path);
 
-			dpb.insertPath(par.process_name, path);
+			dpb.insertString(par.process_name, path);
 		}
 	}
 
@@ -5335,7 +5335,7 @@ static void add_working_directory(ClumpletWriter& dpb, const PathName& node_name
 			ISC_utf8ToSystem(cwd);
 	}
 
-	dpb.insertPath(isc_dpb_working_directory, cwd);
+	dpb.insertString(isc_dpb_working_directory, cwd);
 }
 
 
@@ -5998,7 +5998,14 @@ static THREAD_ENTRY_DECLARE event_thread(THREAD_ENTRY_PARAM arg)
 		P_OP operation = op_void;
 		{	// scope
 			RefMutexGuard portGuard(*port->port_sync, FB_FUNCTION);
-			stuff = port->receive(&packet);
+			try
+			{
+				stuff = port->receive(&packet);
+			}
+			catch(status_exception&)
+			{
+				// ignore
+			}
 
 			operation = packet.p_operation;
 
@@ -6344,6 +6351,7 @@ static void authReceiveResponse(bool havePacket, ClntAuthBlock& cBlock, rem_port
 			break;
 		}
 
+		cBlock.resetDataFromPlugin();
 		cBlock.storeDataForPlugin(d->cstr_length, d->cstr_address);
 		HANDSHAKE_DEBUG(fprintf(stderr, "Cli: receiveResponse: authenticate(%s)\n", cBlock.plugins.name()));
 		if (cBlock.plugins.plugin()->authenticate(&s, &cBlock) == IAuth::AUTH_FAILED)
@@ -7448,7 +7456,9 @@ static void cleanDpb(Firebird::ClumpletWriter& dpb, const ParametersSet* tags)
 
 
 RmtAuthBlock::RmtAuthBlock(const Firebird::AuthReader::AuthBlock& aBlock)
-	: rdr(*getDefaultMemoryPool(), aBlock), info(*getDefaultMemoryPool())
+	: buffer(*getDefaultMemoryPool(), aBlock),
+	  rdr(*getDefaultMemoryPool(), buffer),
+	  info(*getDefaultMemoryPool())
 {
 	LocalStatus ls;
 	CheckStatusWrapper st(&ls);
@@ -7544,7 +7554,8 @@ ClntAuthBlock::ClntAuthBlock(const Firebird::PathName* fileName, Firebird::Clump
 			remAuthBlock.reset(FB_NEW RmtAuthBlock(plain));
 		}
 	}
-	resetClnt(fileName);
+	clntConfig = REMOTE_get_config(fileName, &dpbConfig);
+	resetClnt();
 }
 
 void ClntAuthBlock::resetDataFromPlugin()
@@ -7569,10 +7580,10 @@ void ClntAuthBlock::extractDataFromPluginTo(Firebird::ClumpletWriter& dpb,
 			fb_assert(tags->plugin_name && tags->plugin_list);
 			if (pluginName.hasData())
 			{
-				dpb.insertPath(tags->plugin_name, pluginName);
+				dpb.insertString(tags->plugin_name, pluginName);
 			}
 			dpb.deleteWithTag(tags->plugin_list);
-			dpb.insertPath(tags->plugin_list, pluginList);
+			dpb.insertString(tags->plugin_list, pluginList);
 			firstTime = false;
 			HANDSHAKE_DEBUG(fprintf(stderr,
 				"Cli: extractDataFromPluginTo: first time - added plugName & pluginList\n"));
@@ -7723,8 +7734,7 @@ int ClntAuthBlock::release()
 
 bool ClntAuthBlock::checkPluginName(Firebird::PathName& nameToCheck)
 {
-	Remote::ParsedList parsed;
-	REMOTE_parseList(parsed, pluginList);
+	Remote::ParsedList parsed(pluginList);
 	for (unsigned i = 0; i < parsed.getCount(); ++i)
 	{
 		if (parsed[i] == nameToCheck)
@@ -7743,7 +7753,8 @@ Firebird::ICryptKey* ClntAuthBlock::newKey(CheckStatusWrapper* status)
 		InternalCryptKey* k = FB_NEW InternalCryptKey;
 
 		fb_assert(plugins.hasData());
-		k->t = plugins.name();
+		k->keyName = plugins.name();
+		WIRECRYPT_DEBUG(fprintf(stderr, "Cli: newkey %s\n", k->keyName.c_str());)
 		cryptKeys.add(k);
 
 		return k;
@@ -7757,7 +7768,7 @@ Firebird::ICryptKey* ClntAuthBlock::newKey(CheckStatusWrapper* status)
 
 void ClntAuthBlock::tryNewKeys(rem_port* port)
 {
-	for (unsigned k = 0; k < cryptKeys.getCount(); ++k)
+	for (unsigned k = cryptKeys.getCount(); k--; )
 	{
 		if (port->tryNewKey(cryptKeys[k]))
 		{

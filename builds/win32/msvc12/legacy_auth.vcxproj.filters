@@ -20,5 +20,8 @@
     <ClCompile Include="..\..\..\src\auth\SecurityDatabase\LegacyServer.cpp">
       <Filter>AUTH files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\auth\SecDbCache.cpp">
+      <Filter>AUTH files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

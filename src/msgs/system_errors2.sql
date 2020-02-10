@@ -1225,6 +1225,9 @@ COMMIT WORK;
 (-901, '00', '000', 22, 49, 'fbsvcmgr_fp_read', NULL, NULL)
 (-901, '00', '000', 22, 50, 'fbsvcmgr_fp_empty', NULL, NULL)
 (-901, '00', '000', 22, 52, 'fbsvcmgr_bad_arg', NULL, NULL)
+(-901, '00', '000', 22, 58, 'fbsvcmgr_info_limbo', NULL, NULL)
+(-901, '00', '000', 22, 59, 'fbsvcmgr_limbo_state', NULL, NULL)
+(-901, '00', '000', 22, 60, 'fbsvcmgr_limbo_advise', NULL, NULL)
 -- UTILITIES
 (-901, '00', '000', 23, 1, 'utl_trusted_switch', NULL, NULL)
 -- NBACKUP

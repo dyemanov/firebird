@@ -717,10 +717,10 @@ void ListAggNode::make(DsqlCompilerScratch* dsqlScratch, dsc* desc)
 }
 
 bool ListAggNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, delimiter, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, delimiter, desc, node, forceVarChar);
 }
 
 void ListAggNode::getDesc(thread_db* tdbb, CompilerScratch* csb, dsc* desc)
@@ -831,7 +831,7 @@ AggNode* ListAggNode::dsqlCopy(DsqlCompilerScratch* dsqlScratch) /*const*/
 	dsc desc;
 	desc.makeText(charSet->maxBytesPerChar(), argDesc.getCharSet());
 
-	node->setParameterType(dsqlScratch, &desc, false);
+	node->setParameterType(dsqlScratch, &desc, NULL, false);
 
 	return node;
 }

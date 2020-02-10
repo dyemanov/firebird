@@ -371,7 +371,7 @@ void LockManager::detach_shared_file(CheckStatusWrapper* statusVector)
 	{
 		try
 		{
-			delete m_sharedMemory.release();
+			m_sharedMemory.reset();
 		}
 		catch (const Exception& ex)
 		{

@@ -716,7 +716,6 @@ AC_CHECK_HEADERS(errno.h)
 AC_CHECK_HEADERS(fcntl.h)
 AC_CHECK_HEADERS(grp.h)
 AC_CHECK_HEADERS(pwd.h)
-AC_CHECK_HEADERS(libio.h)
 AC_CHECK_HEADERS(locale.h)
 AC_CHECK_HEADERS(math.h)
 AC_CHECK_HEADERS(pthread.h)
@@ -761,7 +760,6 @@ AC_CHECK_HEADERS(atomic_ops.h)
 AC_CHECK_HEADERS(poll.h)
 AC_CHECK_HEADERS(langinfo.h)
 AC_CHECK_HEADERS(iconv.h)
-AC_CHECK_HEADERS(libio.h)
 AC_CHECK_HEADERS(linux/falloc.h)
 
 AC_CHECK_HEADERS(socket.h sys/socket.h sys/sockio.h winsock2.h)
@@ -823,7 +821,7 @@ dnl HP-UX atomic routines are in atomic library, not standard C library.
 dnl If we can't find atomic routines in vendor library, look for atomic_ops.
 AC_SEARCH_LIBS(atomic_inc, atomic,,
 	AC_CHECK_LIB(atomic_ops, main))
-
+AC_CHECK_HEADERS(utime.h)
 
 dnl Check for libraries for static C++ runtime linking
 AC_CHECK_LIB(supc++, main, XE_APPEND(-lsupc++, STATIC_CXXSUPPORT_LIB))
@@ -969,6 +967,7 @@ fi
 dnl Some OS place iconv() support in separate library
 if test "$ac_cv_header_iconv_h" = "yes"; then
 AC_SEARCH_LIBS(iconv_open, iconv)
+AC_SEARCH_LIBS(libiconv_open, iconv)
 fi
 
 dnl HPUX has a bug in .h files. To detect it we need C++ here.

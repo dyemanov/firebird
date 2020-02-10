@@ -1059,6 +1059,10 @@ interface TraceTransaction : Versioned
 	int getWait();
 	uint getIsolation();
 	PerformanceInfo* getPerf();
+
+version: // 3.0.4 -> 3.0.5
+	int64 getInitialID();
+	int64 getPreviousID();
 }
 
 interface TraceParams : Versioned
@@ -1165,6 +1169,8 @@ interface TraceSweepInfo : Versioned
 interface TraceLogWriter : ReferenceCounted
 {
 	uint write(const void* buf, uint size);
+version: // 3.0.4 -> 3.0.5
+	uint write_s(Status status, const void* buf, uint size);
 }
 
 interface TraceInitInfo : Versioned

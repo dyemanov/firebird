@@ -84,9 +84,10 @@ class TraceTransactionImpl :
 	public Firebird::AutoIface<Firebird::ITraceTransactionImpl<TraceTransactionImpl, Firebird::CheckStatusWrapper> >
 {
 public:
-	TraceTransactionImpl(const jrd_tra* tran, PerformanceInfo* perf = NULL) :
+	TraceTransactionImpl(const jrd_tra* tran, PerformanceInfo* perf = NULL, ISC_INT64 prevID = 0) :
 		m_tran(tran),
-		m_perf(perf)
+		m_perf(perf),
+		m_prevID(prevID)
 	{}
 
 	// TraceTransaction implementation
@@ -95,10 +96,13 @@ public:
 	int getWait();
 	unsigned getIsolation();
 	PerformanceInfo* getPerf()	{ return m_perf; }
+	ISC_INT64 getInitialID();
+	ISC_INT64 getPreviousID()	{ return m_prevID; }
 
 private:
 	const jrd_tra* const m_tran;
 	PerformanceInfo* const m_perf;
+	const ISC_INT64 m_prevID;
 };
 
 

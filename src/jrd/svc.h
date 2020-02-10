@@ -191,6 +191,10 @@ public:		// external interface with service
 		return svc_username;
 	}
 
+	// return true if user have admin privileges in security database used 
+	// for service user authentication
+	bool getUserAdminFlag() const;
+
 	const Firebird::string&	getNetworkProtocol() const	{ return svc_network_protocol; }
 	const Firebird::string&	getRemoteAddress() const	{ return svc_remote_address; }
 	const Firebird::string&	getRemoteProcess() const	{ return svc_remote_process; }

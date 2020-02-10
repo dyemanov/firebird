@@ -224,9 +224,6 @@
 /* Define to 1 if you have the `atomic_ops' library (-latomic_ops). */
 /* #undef HAVE_LIBATOMIC_OPS */
 
-/* Define to 1 if you have the <libio.h> header file. */
-/* #undef HAVE_LIBIO_H */
-
 /* Define to 1 if you have the `m' library (-lm). */
 #define HAVE_LIBM 1
 

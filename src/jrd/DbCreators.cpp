@@ -74,7 +74,7 @@ bool openDb(const char* securityDb, RefPtr<IAttachment>& att, RefPtr<ITransactio
 	ClumpletWriter embeddedSysdba(ClumpletWriter::Tagged, MAX_DPB_SIZE, isc_dpb_version1);
 	embeddedSysdba.insertString(isc_dpb_user_name, SYSDBA_USER_NAME, fb_strlen(SYSDBA_USER_NAME));
 	embeddedSysdba.insertByte(isc_dpb_sec_attach, TRUE);
-	embeddedSysdba.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
+	embeddedSysdba.insertString(isc_dpb_config, Auth::ParsedList::getNonLoopbackProviders(securityDb));
 	embeddedSysdba.insertByte(isc_dpb_no_db_triggers, TRUE);
 
 	FbLocalStatus st;

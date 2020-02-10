@@ -23,11 +23,11 @@ FB_RES="$FB_FW/Versions/A/Resources"
 # Now create the firebird group
 echo "Create the Firebird group 10.7+"
 if dscl localhost -read /Local/Default/Groups/firebird 2&>1 /dev/null; then
-	echo "Group Found" 
+	echo "Group Found"
 else
 gid=501
-dscl localhost -search /Local/Default/Groups PrimaryGroupID $gid | grep $gid 
-while [ "$?" = "0" ]; do 
+dscl localhost -search /Local/Default/Groups PrimaryGroupID $gid | grep $gid
+while [ "$?" = "0" ]; do
 	let "gid =$gid+1"
 	dscl localhost -search /Local/Default/Groups PrimaryGroupID $gid | grep $gid
 done
@@ -44,10 +44,10 @@ if dscl localhost -read /Local/Default/Users/firebird 2&>1 /dev/null; then
 	echo "User Found"
 else
 ugid=501
-dscl localhost -search /Local/Default/Users UniqueID $ugid | grep $ugid 
-while [ "$?" = "0" ]; do 
+dscl localhost -search /Local/Default/Users UniqueID $ugid | grep $ugid
+while [ "$?" = "0" ]; do
 	let "ugid=$ugid+1"
-	dscl localhost -search /Local/Default/Users UniqueID $ugid | grep $ugid 
+	dscl localhost -search /Local/Default/Users UniqueID $ugid | grep $ugid
 done
 echo "create the firebird user 10.7+"
 	dscl localhost -create /Local/Default/Users/firebird
@@ -55,7 +55,7 @@ echo "create the firebird user 10.7+"
 	dscl localhost -create /Local/Default/Users/firebird Password "*"
 	dscl localhost -create /Local/Default/Users/firebird UserShell /bin/tcsh
 	dscl localhost -create /Local/Default/Users/firebird RecordName firebird
-	dscl localhost -create /Local/Default/Users/firebird PrimaryGroupID $gid 
+	dscl localhost -create /Local/Default/Users/firebird PrimaryGroupID $gid
 	dscl localhost -create /Local/Default/Users/firebird UniqueID $ugid
 	dscl localhost -create /Local/Default/Users/firebird RealName "Firebird Database"
 fi
@@ -75,7 +75,6 @@ echo "Set the permissions correctly"
     chmod 777 "$FB_FW/Resources/"
     chmod 660 "$FB_FW/Resources/security3.fdb"
     chmod 444 "$FB_FW/Resources/help/help.fdb"
-    chmod a+s "$FB_FW/Resources/bin/firebird"
 
 # Remove all older traces of Classic first
 echo "Remove all older traces of Classic first"
@@ -92,21 +91,6 @@ if [ -f /etc/xinetd.d/firebird ]; then
 	rm /etc/xinetd.d/firebird
 	HUPNEEDED='y'
 fi
-
-# Make sure hosts.equiv files are set correctly
-echo "Make sure hosts.equiv files are set correctly"
-
-cp /etc/hosts.equiv /etc/hosts.equiv.fbsave
-if grep -x "localhost" /etc/hosts.equiv > /dev/null; then                
-	echo -n
-else     
-    echo "localhost" >> /etc/hosts.equiv                
-fi    
-if grep -x "localhost.localdomain" /etc/hosts.equiv > /dev/null; then    
-	echo -n
-else     
-    echo "localhost.localdomain" >> /etc/hosts.equiv    
-fi    
 
 # Install the saved security2 database, if any
 echo "Install the saved security2 database"
@@ -149,12 +133,12 @@ fi
 
 # Initilise the security database with default user
 echo "Add SYSDBA and password"
-$FB_FW/Versions/A/Resources/bin/gsec -add sysdba -pw masterkey -user sysdba 
+$FB_FW/Versions/A/Resources/bin/gsec -add sysdba -pw masterkey -user sysdba
 rm -fr /tmp/firebird
 
 # And last but not least, start the Server
 echo "Start the Server via launchctl"
 
 cp $FB_FW/Resources/org.firebird.gds.plist /Library/LaunchDaemons/org.firebird.gds.plist
-launchctl load /Library/LaunchDaemons/org.firebird.gds.plist	
+launchctl load /Library/LaunchDaemons/org.firebird.gds.plist
 

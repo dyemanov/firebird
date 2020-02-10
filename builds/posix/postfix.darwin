@@ -18,174 +18,85 @@
 # Start of file prefix.darwin:	$(VERSION)	DARWIN
 # 2 Oct 2002, Nickolay Samofatov - Major Cleanup
 
-
-FB_FW = ../gen/Release/Firebird.framework
+TARGET ?= Release
 ICU_VERS = icu54
-ICU_LOC = $(HOME)/$(ICU_VERS)/icu/source/lib/
+ICU_LOC ?= $(HOME)/$(ICU_VERS)/icu/source/lib/
+FB_FW = ../gen/$(TARGET)/frameworks/Firebird3.framework
 
-all: otool framework
+all: framework
 
-otool: bin lib plugins intl
-
-BINLOC=$(CURDIR)/Release/firebird/bin/
-LIBLOC=$(CURDIR)/Release/firebird/lib/
-NEWLIBLOC=/Library/Frameworks/Firebird.framework/Libraries/
-PLUGLOC=$(CURDIR)/Release/firebird/plugins/
-NEWPLUGLOC=/Library/Frameworks/Firebird.framework/Resources/plugins/
-UDRPLUGLOC=$(CURDIR)/Release/firebird/plugins/udr/
-NEWUDRPLUGLOC=/Library/Frameworks/Firebird.framework/Resources/plugins/udr
-INTLLOC=$(CURDIR)/Release/firebird/intl/
-NEWINTLLOC=/Library/Frameworks/Firebird.framework/Resources/plugins/
-OLDFBCLIENT=$(CURDIR)/Release/firebird/lib/libfbclient.dylib.3.0.4
-NEWFBCLIENT=/Library/Frameworks/Firebird.framework/Versions/A/Firebird
-
-bin:
-
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)isql
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)gfix
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)gbak
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)gpre
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)qli
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)fb_lock_print
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)gsec
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)gstat
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)nbackup
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)fbguard
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)fbtracemgr
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(BINLOC)firebird
-lib:
-
-	install_name_tool -id $(NEWLIBLOC)libfbclient.dylib $(LIBLOC)libfbclient.dylib
-
-plugins:
-
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libCryptKeyHolder_example.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libDbCrypt_example.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libEngine12.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libfbtrace.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libLegacy_Auth.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libLegacy_UserManager.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libSrp.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(PLUGLOC)libudr_engine.dylib
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(UDRPLUGLOC)libudrcpp_example.dylib
-
-	install_name_tool -id $(NEWPLUGLOC)libCryptKeyHolder_example.dylib $(PLUGLOC)libCryptKeyHolder_example.dylib
-	install_name_tool -id $(NEWPLUGLOC)libDbCrypt_example.dylib $(PLUGLOC)libDbCrypt_example.dylib
-	install_name_tool -id $(NEWPLUGLOC)libEngine12.dylib $(PLUGLOC)libEngine12.dylib
-	install_name_tool -id $(NEWPLUGLOC)libfbtrace.dylib $(PLUGLOC)libfbtrace.dylib
-	install_name_tool -id $(NEWPLUGLOC)libLegacyAuth.dylib $(PLUGLOC)libLegacy_Auth.dylib
-	install_name_tool -id $(NEWPLUGLOC)libLegacyAuth.dylib $(PLUGLOC)libLegacy_Auth.dylib
-	install_name_tool -id $(NEWPLUGLOC)libLegacy_UserManager.dylib $(PLUGLOC)libLegacy_UserManager.dylib
-	install_name_tool -id $(NEWPLUGLOC)libSrp.dylib $(PLUGLOC)libSrp.dylib
-	install_name_tool -id $(NEWPLUGLOC)libudr_engine $(PLUGLOC)libudr_engine.dylib
-	install_name_tool -id $(NEWUDRPLUGLOC)libudrcpp_example.dylib $(UDRPLUGLOC)libudrcpp_example.dylib
-
-intl:
-
-	install_name_tool -change $(OLDFBCLIENT) $(NEWFBCLIENT) $(INTLLOC)libfbintl.dylib
-	install_name_tool -id $(NEWINTLLOC)fbintl  $(INTLLOC)libfbintl.dylib
-
-framework darwin_setup_framework:
-	-$(RM) -rf $(FB_FW) ../gen/Release/Firebird.framework
-	mkdir -p $(FB_FW)/Versions/A/Libraries
-	ln -s Versions/Current/Firebird $(FB_FW)/Firebird
-	ln -s Versions/Current/Headers $(FB_FW)/Headers
-	ln -s Versions/Current/Resources $(FB_FW)/Resources
-	ln -s Versions/Current/Libraries $(FB_FW)/Libraries
-	ln -s A $(FB_FW)/Versions/Current
-	ln -s ../../../include $(FB_FW)/Versions/A/Headers
-	ln -s ../../../lib $(FB_FW)/Versions/A/Libraries
-	ln -s ../../../../../../firebird.msg \
-			$(FB_FW)/Resources/firebird.msg
-	ln -s ../../../../../../bin $(FB_FW)/Resources/bin
-	ln -s ../../../../../../UDF $(FB_FW)/Resources/UDF
-	ln -s ../../../../../../intl $(FB_FW)/Resources/intl
-	ln -s ../../../../../../plugins $(FB_FW)/Resources/plugins
-	ln -s ../../../../../../security3.fdb \
-				$(FB_FW)/Resources/security3.fdb
-	ln -s ../../../../../../help $(FB_FW)/Resources/help
-
-framework darwin_finish_framework: FB_FW = ../gen/Release/frameworks/Firebird3.framework
-framework darwin_finish_framework:
+framework:
 	-$(RM) -rf $(FB_FW)
 	mkdir -p $(FB_FW)/Versions/A/Libraries
+
+	cp $(ICU_LOC)*.dylib ../gen/$(TARGET)/firebird/lib/
+
 	ln -s Versions/Current/Firebird $(FB_FW)/Firebird
 	ln -s Versions/Current/Headers $(FB_FW)/Headers
 	ln -s Versions/Current/Resources $(FB_FW)/Resources
 	ln -s Versions/Current/Libraries $(FB_FW)/Libraries
 	ln -s A $(FB_FW)/Versions/Current
-	cp -r ../gen/Release/firebird/include $(FB_FW)/Versions/A/Headers
-	cp ../gen/Release/firebird/lib/libfbclient.dylib $(FB_FW)/Versions/A/Firebird
-	cp ../gen/Release/firebird/lib/libfbclient.dylib $(FB_FW)/Versions/A/Libraries/libfbclient.dylib
-	cp $(ICU_LOC)*.dylib ../gen/Release/firebird/lib/
-	cp ../gen/Release/firebird/lib/libicudata.dylib $(FB_FW)/Versions/A/Libraries/libicudata.dylib
-	cp ../gen/Release/firebird/lib/libicui18n.dylib $(FB_FW)/Versions/A/Libraries/libicui18n.dylib
-	cp ../gen/Release/firebird/lib/libicuuc.dylib $(FB_FW)/Versions/A/Libraries/libicuuc.dylib
-	cp ../gen/Release/firebird/lib/libib_util.dylib $(FB_FW)/Versions/A/Libraries/libib_util.dylib
+	cp -r ../gen/$(TARGET)/firebird/include $(FB_FW)/Versions/A/Headers
+
+	mkdir -p $(FB_FW)/Versions/A/Resources/lib
+	cp ../gen/$(TARGET)/firebird/lib/libtommath.dylib $(FB_FW)/Versions/A/Resources/lib/
+	cp ../gen/$(TARGET)/firebird/lib/libfbclient.dylib $(FB_FW)/Versions/A/Resources/lib/
+	cp ../gen/$(TARGET)/firebird/lib/libicudata*.dylib $(FB_FW)/Versions/A/Resources/lib/
+	cp ../gen/$(TARGET)/firebird/lib/libicui18n*.dylib $(FB_FW)/Versions/A/Resources/lib/
+	cp ../gen/$(TARGET)/firebird/lib/libicuuc*.dylib $(FB_FW)/Versions/A/Resources/lib/
+	cp ../gen/$(TARGET)/firebird/lib/libib_util.dylib $(FB_FW)/Versions/A/Resources/lib/
+	ln -s ../Resources/lib/libfbclient.dylib $(FB_FW)/Versions/A/Libraries/libfbclient.dylib
+	ln -s ../Resources/lib/libib_util.dylib $(FB_FW)/Versions/A/Libraries/libib_util.dylib
+
 	mkdir -p $(FB_FW)/Versions/A/Resources/English.lproj
 	mkdir -p $(FB_FW)/Versions/A/Resources/UDF
-	cp  ../gen/Release/firebird/UDF/fbudf.dylib $(FB_FW)/Versions/A/Resources/UDF/fbudf.dylib
-	cp  ../gen/Release/firebird/UDF/ib_udf.dylib $(FB_FW)/Versions/A/Resources/UDF/ib_udf.dylib
-	cp  ../gen/Release/firebird/UDF/fbudf.sql $(FB_FW)/Versions/A/Resources/UDF/fbudf.sql
-	cp  ../gen/Release/firebird/UDF/ib_udf.sql $(FB_FW)/Versions/A/Resources/UDF/ib_udf.sql
-	cp  ../gen/Release/firebird/UDF/ib_udf2.sql $(FB_FW)/Versions/A/Resources/UDF/ib_udf2.sql
+	cp  ../gen/$(TARGET)/firebird/UDF/fbudf.dylib $(FB_FW)/Versions/A/Resources/UDF/fbudf.dylib
+	cp  ../gen/$(TARGET)/firebird/UDF/ib_udf.dylib $(FB_FW)/Versions/A/Resources/UDF/ib_udf.dylib
+	cp  ../gen/$(TARGET)/firebird/UDF/fbudf.sql $(FB_FW)/Versions/A/Resources/UDF/fbudf.sql
+	cp  ../gen/$(TARGET)/firebird/UDF/ib_udf.sql $(FB_FW)/Versions/A/Resources/UDF/ib_udf.sql
+	cp  ../gen/$(TARGET)/firebird/UDF/ib_udf2.sql $(FB_FW)/Versions/A/Resources/UDF/ib_udf2.sql
 	mkdir -p $(FB_FW)/Versions/A/Resources/intl
-	cp -r ../gen/Release/firebird/intl/libfbintl.dylib \
-		$(FB_FW)/Versions/A/Resources/intl/fbintl
-	cp ../gen/Release/firebird/intl/fbintl.conf \
-		$(FB_FW)/Versions/A/Resources/intl/fbintl.conf
-	chmod a+rx $(FB_FW)/Versions/A/Resources/intl/fbintl
-	cp -r ../gen/Release/firebird/plugins \
-		$(FB_FW)/Versions/A/Resources/plugins
-	cp ../gen/Release/firebird/security3.fdb \
-                        $(FB_FW)/Versions/A/Resources/security3.fdb
-	cp ../gen/Release/firebird/firebird.msg \
-                        $(FB_FW)/Versions/A/Resources/firebird.msg
-	cp -r ../gen/Release/firebird/help $(FB_FW)/Versions/A/Resources/help
+	cp -r ../gen/$(TARGET)/firebird/intl/libfbintl.dylib $(FB_FW)/Versions/A/Resources/intl/libfbintl.dylib
+	cp ../gen/$(TARGET)/firebird/intl/fbintl.conf $(FB_FW)/Versions/A/Resources/intl/fbintl.conf
+	#chmod a+rx $(FB_FW)/Versions/A/Resources/intl/fbintl
+	cp -r ../gen/$(TARGET)/firebird/plugins $(FB_FW)/Versions/A/Resources/plugins
+	cp ../gen/$(TARGET)/firebird/security3.fdb $(FB_FW)/Versions/A/Resources/security3.fdb
+	cp ../gen/$(TARGET)/firebird/firebird.msg $(FB_FW)/Versions/A/Resources/firebird.msg
+	cp -r ../gen/$(TARGET)/firebird/help $(FB_FW)/Versions/A/Resources/help
 	mkdir -p $(FB_FW)/Resources/doc
 	cp -r ../doc $(FB_FW)/Resources
 	mkdir -p $(FB_FW)/Resources/examples
-	cp -r ../gen/Release/firebird/examples $(FB_FW)/Resources
+	cp -r ../gen/$(TARGET)/firebird/examples $(FB_FW)/Resources
 	mkdir -p $(FB_FW)/Resources/bin
 	touch $(FB_FW)/Resources/SuperServer
-	chflags hidden $(FB_FW)/Resources/SuperServer 
-	cp ../gen/Release/firebird/bin/gfix $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/gbak $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/isql $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/gpre $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/qli $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/fb_lock_print $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/gsec $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/gstat $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/nbackup $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/fbguard $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/fbtracemgr $(FB_FW)/Versions/A/Resources/bin
-	cp ../gen/Release/firebird/bin/firebird $(FB_FW)/Versions/A/Resources/bin
+	chflags hidden $(FB_FW)/Resources/SuperServer
+	cp ../gen/$(TARGET)/firebird/bin/gfix $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/gbak $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/isql $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/gpre $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/qli $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/fb_lock_print $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/gsec $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/gstat $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/nbackup $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/fbguard $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/fbtracemgr $(FB_FW)/Versions/A/Resources/bin
+	cp ../gen/$(TARGET)/firebird/bin/firebird $(FB_FW)/Versions/A/Resources/bin
 	chmod +x ../builds/install/arch-specific/darwin/changeServerMode
-	cp ../builds/install/arch-specific/darwin/changeServerMode \
-			$(FB_FW)/Versions/A/Resources/bin/changeServerMode.sh
+	cp ../builds/install/arch-specific/darwin/changeServerMode $(FB_FW)/Versions/A/Resources/bin/changeServerMode.sh
 	cp ../src/extlib/ib_udf.sql $(FB_FW)/Versions/A/Resources/UDF
 	cp ../src/extlib/fbudf/fbudf.sql $(FB_FW)/Versions/A/Resources/UDF
-	cp ../builds/install/arch-specific/darwin/FrameworkInfo.plist \
-			$(FB_FW)/Versions/A/Resources/Info.plist
-	cp ../builds/install/arch-specific/darwin/launchd.org.firebird.gds.plist \
-			$(FB_FW)/Versions/A/Resources/org.firebird.gds.plist
-	cp ../builds/install/arch-specific/darwin/launchdcs.org.firebird.gds.plist \
-			$(FB_FW)/Versions/A/Resources/cs.org.firebird.gds.plist
-	cp ../builds/install/arch-specific/darwin/Readme.txt \
-			$(FB_FW)/Versions/A/Resources/Readme.txt
-	cp ../builds/install/arch-specific/darwin/License.txt \
-			$(FB_FW)/Versions/A/Resources/License.txt
-	cp ../gen/Release/firebird/firebird.conf \
-                        $(FB_FW)/Versions/A/Resources//firebird.conf
-	cp ../gen/Release/firebird/databases.conf \
-		$(FB_FW)/Versions/A/Resources/databases.conf
-	cp ../gen/Release/firebird/fbtrace.conf \
-			$(FB_FW)/Versions/A/Resources/fbtrace.conf
-	cp ../gen/Release/firebird/plugins.conf \
-			$(FB_FW)/Versions/A/Resources/plugins.conf
+	cp ../builds/install/arch-specific/darwin/FrameworkInfo.plist $(FB_FW)/Versions/A/Resources/Info.plist
+	cp ../builds/install/arch-specific/darwin/launchd.org.firebird.gds.plist $(FB_FW)/Versions/A/Resources/org.firebird.gds.plist
+	cp ../builds/install/arch-specific/darwin/launchdcs.org.firebird.gds.plist $(FB_FW)/Versions/A/Resources/cs.org.firebird.gds.plist
+	cp ../builds/install/arch-specific/darwin/Readme.txt $(FB_FW)/Versions/A/Resources/Readme.txt
+	cp ../builds/install/arch-specific/darwin/License.txt $(FB_FW)/Versions/A/Resources/License.txt
+	cp ../gen/$(TARGET)/firebird/firebird.conf $(FB_FW)/Versions/A/Resources//firebird.conf
+	cp ../gen/$(TARGET)/firebird/databases.conf $(FB_FW)/Versions/A/Resources/databases.conf
+	cp ../gen/$(TARGET)/firebird/fbtrace.conf $(FB_FW)/Versions/A/Resources/fbtrace.conf
+	cp ../gen/$(TARGET)/firebird/plugins.conf $(FB_FW)/Versions/A/Resources/plugins.conf
 	mkdir $(FB_FW)/Versions/A/Resources/misc
 	mkdir $(FB_FW)/Versions/A/Resources/misc/upgrade
-	cp -r ../src/misc/upgrade/v3.0 \
-		$(FB_FW)/Versions/A/Resources/misc/upgrade
+	cp -r ../src/misc/upgrade/v3.0 $(FB_FW)/Versions/A/Resources/misc/upgrade
 
+	install_name_tool -id /Library/Frameworks/Firebird.framework/Libraries/libfbclient.dylib $(FB_FW)/Versions/A/Resources/lib/libfbclient.dylib

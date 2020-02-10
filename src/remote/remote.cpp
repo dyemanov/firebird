@@ -944,13 +944,13 @@ void ClntAuthBlock::extractDataFromPluginTo(Firebird::ClumpletWriter& user_id)
 	if (pluginName.hasData())
 	{
 		HANDSHAKE_DEBUG(fprintf(stderr, "Cli: extractDataFromPluginTo: pluginName=%s\n", pluginName.c_str()));
-		user_id.insertPath(CNCT_plugin_name, pluginName);
+		user_id.insertString(CNCT_plugin_name, pluginName);
 	}
 
 	// Add plugin list
 	if (pluginList.hasData())
 	{
-		user_id.insertPath(CNCT_plugin_list, pluginList);
+		user_id.insertString(CNCT_plugin_list, pluginList);
 	}
 
 	// This is specially tricky field - user_id is limited to 255 bytes per entry,
@@ -963,7 +963,7 @@ void ClntAuthBlock::extractDataFromPluginTo(Firebird::ClumpletWriter& user_id)
 	user_id.insertInt(CNCT_client_crypt, clntConfig->getWireCrypt(WC_CLIENT));
 }
 
-void ClntAuthBlock::resetClnt(const Firebird::PathName* fileName, const CSTRING* listStr)
+void ClntAuthBlock::resetClnt(const CSTRING* listStr)
 {
 	if (listStr)
 	{
@@ -986,14 +986,13 @@ void ClntAuthBlock::resetClnt(const Firebird::PathName* fileName, const CSTRING*
 	dataFromPlugin.clear();
 	firstTime = true;
 
-	clntConfig = REMOTE_get_config(fileName, &dpbConfig);
 	pluginList = dpbPlugins.hasData() ? dpbPlugins :
 		clntConfig->getPlugins(Firebird::IPluginManager::TYPE_AUTH_CLIENT);
 
 	Firebird::PathName final;
 	if (serverPluginList.hasData())
 	{
-		Auth::mergeLists(final, serverPluginList, pluginList);
+		Remote::ParsedList::mergeLists(final, serverPluginList, pluginList);
 		if (final.length() == 0)
 		{
 			HANDSHAKE_DEBUG(fprintf(stderr, "Cli: No matching plugins on client\n"));
@@ -1193,7 +1192,7 @@ bool rem_port::tryKeyType(const KnownServerKey& srvKey, InternalCryptKey* cryptK
 		return true;
 	}
 
-	if (srvKey.type != cryptKey->t)
+	if (srvKey.type != cryptKey->keyName)
 	{
 		return false;
 	}
@@ -1206,8 +1205,7 @@ bool rem_port::tryKeyType(const KnownServerKey& srvKey, InternalCryptKey* cryptK
 
 	// we got correct key's type pair
 	// check what about crypt plugin for it
-	Remote::ParsedList clientPlugins;
-	REMOTE_parseList(clientPlugins, getPortConfig()->getPlugins(Firebird::IPluginManager::TYPE_WIRE_CRYPT));
+	Remote::ParsedList clientPlugins(getPortConfig()->getPlugins(Firebird::IPluginManager::TYPE_WIRE_CRYPT));
 	for (unsigned n = 0; n < clientPlugins.getCount(); ++n)
 	{
 		Firebird::PathName p(clientPlugins[n]);
@@ -1236,7 +1234,7 @@ bool rem_port::tryKeyType(const KnownServerKey& srvKey, InternalCryptKey* cryptK
 				// therefore sent packet will be not encrypted
 				PACKET crypt;
 				crypt.p_operation = op_crypt;
-				setCStr(crypt.p_crypt.p_key, cryptKey->t.c_str());
+				setCStr(crypt.p_crypt.p_key, cryptKey->keyName.c_str());
 				setCStr(crypt.p_crypt.p_plugin, p.c_str());
 				send(&crypt);
 
@@ -1293,7 +1291,8 @@ Firebird::ICryptKey* SrvAuthBlock::newKey(Firebird::CheckStatusWrapper* status)
 	{
 		InternalCryptKey* k = FB_NEW InternalCryptKey;
 
-		k->t = pluginName.c_str();
+		k->keyName = pluginName.c_str();
+		WIRECRYPT_DEBUG(fprintf(stderr, "Srv: newkey %s\n", k->keyName.c_str());)
 		port->port_crypt_keys.push(k);
 		newKeys.push(k);
 
@@ -1370,7 +1369,14 @@ namespace {
 
 	void* allocFunc(void*, uInt items, uInt size)
 	{
-		return MemoryPool::globalAlloc(items * size ALLOC_ARGS);
+		try
+		{
+			return MemoryPool::globalAlloc(items * size ALLOC_ARGS);
+		}
+		catch (const Firebird::Exception&)
+		{
+			return NULL;
+		}
 	}
 
 	void freeFunc(void*, void* address)
@@ -1626,7 +1632,7 @@ void InternalCryptKey::setSymmetric(Firebird::CheckStatusWrapper* status, const 
 	try
 	{
 		if (type)
-			t = type;
+			keyName = type;
 		encrypt.set(keyLength, key);
 		decrypt.clear();
 	}
@@ -1643,7 +1649,7 @@ void InternalCryptKey::setAsymmetric(Firebird::CheckStatusWrapper* status, const
 	try
 	{
 		if (type)
-			t = type;
+			keyName = type;
 		encrypt.set(encryptKeyLength, encryptKey);
 		decrypt.set(decryptKeyLength, decryptKey);
 	}

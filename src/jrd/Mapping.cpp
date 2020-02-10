@@ -43,6 +43,7 @@
 #include "../common/isc_proto.h"
 #include "../common/ThreadStart.h"
 #include "../common/db_alias.h"
+#include "../common/security.h"
 
 #include "../jrd/Mapping.h"
 #include "../jrd/tra.h"
@@ -143,6 +144,11 @@ private:
 	}
 
 	unsigned char sequence;
+};
+
+struct ExtInfo : public AuthReader::Info
+{
+	NoCaseString currentRole, currentUser;
 };
 
 class Map;
@@ -339,7 +345,7 @@ public:
 		}
 	}
 
-	void map(bool flagWild, AuthReader::Info& info, AuthWriter& newBlock)
+	void map(bool flagWild, ExtInfo& info, AuthWriter& newBlock)
 	{
 		if (info.type == TYPE_SEEN)
 			return;
@@ -355,7 +361,7 @@ public:
 			varUsing(info, from, newBlock);
 	}
 
-	void search(AuthReader::Info& info, const Map& from, AuthWriter& newBlock,
+	void search(ExtInfo& info, const Map& from, AuthWriter& newBlock,
 		const NoCaseString& originalUserName)
 	{
 		MAP_DEBUG(fprintf(stderr, "Key = %s\n", from.makeHashKey().c_str()));
@@ -368,21 +374,29 @@ public:
 			unsigned flagRolUsr = to->toRole ? FLAG_ROLE : FLAG_USER;
 			if (info.found & flagRolUsr)
 				continue;
+
+			const NoCaseString& newName(to->to == "*" ? originalUserName : to->to);
+			NoCaseString& infoName(to->toRole ? info.currentRole : info.currentUser);
 			if (info.current & flagRolUsr)
+			{
+				if (infoName == newName)
+					continue;
 				(Arg::Gds(isc_map_multi) << originalUserName).raise();
+			}
 
 			info.current |= flagRolUsr;
+			infoName = newName;
 
 			AuthReader::Info newInfo;
 			newInfo.type = to->toRole ? NM_ROLE : NM_USER;
-			newInfo.name = to->to == "*" ? originalUserName : to->to;
+			newInfo.name = newName;
 	        newInfo.secDb = this->name;
 	        newInfo.origPlug = info.origPlug.hasData() ? info.origPlug : info.plugin;
 			newBlock.add(newInfo);
 		}
 	}
 
-	void varPlugin(AuthReader::Info& info, Map from, AuthWriter& newBlock)
+	void varPlugin(ExtInfo& info, Map from, AuthWriter& newBlock)
 	{
 		varDb(info, from, newBlock);
 		if (from.plugin != "*")
@@ -392,7 +406,7 @@ public:
 		}
 	}
 
-	void varDb(AuthReader::Info& info, Map from, AuthWriter& newBlock)
+	void varDb(ExtInfo& info, Map from, AuthWriter& newBlock)
 	{
 		varFrom(info, from, newBlock);
 		if (from.db != "*")
@@ -402,7 +416,7 @@ public:
 		}
 	}
 
-	void varFrom(AuthReader::Info& info, Map from, AuthWriter& newBlock)
+	void varFrom(ExtInfo& info, Map from, AuthWriter& newBlock)
 	{
 		NoCaseString originalUserName = from.from;
 		search(info, from, newBlock, originalUserName);
@@ -410,7 +424,7 @@ public:
 		search(info, from, newBlock, originalUserName);
 	}
 
-	void varUsing(AuthReader::Info& info, Map from, AuthWriter& newBlock)
+	void varUsing(ExtInfo& info, Map from, AuthWriter& newBlock)
 	{
 		if (from.usng == 'P')
 		{
@@ -437,7 +451,7 @@ public:
 			fb_assert(false);
 	}
 
-	bool map4(bool flagWild, unsigned flagSet, AuthReader& rdr, AuthReader::Info& info, AuthWriter& newBlock)
+	bool map4(bool flagWild, unsigned flagSet, AuthReader& rdr, ExtInfo& info, AuthWriter& newBlock)
 	{
 		if (!flagSet)
 		{
@@ -922,7 +936,7 @@ public:
 		ClumpletWriter embeddedSysdba(ClumpletWriter::Tagged, 1024, isc_dpb_version1);
 		embeddedSysdba.insertString(isc_dpb_user_name, SYSDBA_USER_NAME, fb_strlen(SYSDBA_USER_NAME));
 		embeddedSysdba.insertByte(isc_dpb_sec_attach, TRUE);
-		embeddedSysdba.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
+		embeddedSysdba.insertString(isc_dpb_config, Auth::ParsedList::getNonLoopbackProviders(aliasDb));
 		embeddedSysdba.insertByte(isc_dpb_map_attach, TRUE);
 		embeddedSysdba.insertByte(isc_dpb_no_db_triggers, TRUE);
 
@@ -1008,7 +1022,7 @@ bool mapUser(string& name, string& trusted_role, Firebird::string* auth_method,
 	// Perform lock & map only when needed
 	if ((flags != (FLAG_DB | FLAG_SEC)) && authBlock.hasData())
 	{
-		AuthReader::Info info;
+		ExtInfo info;
 		SyncType syncType = SYNC_SHARED;
 		FbLocalStatus st;
 		DbHandle iSec;
@@ -1220,15 +1234,16 @@ RecordBuffer* MappingList::getList(thread_db* tdbb, jrd_rel* relation)
 
 	try
 	{
+		const char* dbName = tdbb->getDatabase()->dbb_config->getSecurityDatabase();
+
 		ClumpletWriter embeddedSysdba(ClumpletWriter::Tagged,
 			MAX_DPB_SIZE, isc_dpb_version1);
 		embeddedSysdba.insertString(isc_dpb_user_name, SYSDBA_USER_NAME,
 			fb_strlen(SYSDBA_USER_NAME));
 		embeddedSysdba.insertByte(isc_dpb_sec_attach, TRUE);
-		embeddedSysdba.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
+		embeddedSysdba.insertString(isc_dpb_config, Auth::ParsedList::getNonLoopbackProviders(dbName));
 		embeddedSysdba.insertByte(isc_dpb_no_db_triggers, TRUE);
 
-		const char* dbName = tdbb->getDatabase()->dbb_config->getSecurityDatabase();
 		att = prov->attachDatabase(&st, dbName,
 			embeddedSysdba.getBufferLength(), embeddedSysdba.getBuffer());
 		if (st->getState() & IStatus::STATE_ERRORS)

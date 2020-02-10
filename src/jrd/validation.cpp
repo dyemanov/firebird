@@ -729,7 +729,7 @@ static int validate(Firebird::UtilSvc* svc)
 		expandedFilename = dbName;
 
 	if (dbName != expandedFilename)
-		dpb.insertPath(isc_dpb_org_filename, dbName);
+		dpb.insertString(isc_dpb_org_filename, dbName);
 
 	FbLocalStatus status;
 	AutoPlugin<JProvider> jProv(JProvider::getInstance());

@@ -567,6 +567,7 @@ void DsqlCompilerScratch::clearCTEs()
 	flags &= ~DsqlCompilerScratch::FLAG_RECURSIVE_CTE;
 	ctes.clear();
 	cteAliases.clear();
+	currCteAlias = NULL;
 }
 
 // Look for unused CTEs and issue a warning about its presence. Also, make DSQL 

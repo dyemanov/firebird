@@ -471,6 +471,8 @@ type
 	ITraceTransaction_getWaitPtr = function(this: ITraceTransaction): Integer; cdecl;
 	ITraceTransaction_getIsolationPtr = function(this: ITraceTransaction): Cardinal; cdecl;
 	ITraceTransaction_getPerfPtr = function(this: ITraceTransaction): PerformanceInfoPtr; cdecl;
+	ITraceTransaction_getInitialIDPtr = function(this: ITraceTransaction): Int64; cdecl;
+	ITraceTransaction_getPreviousIDPtr = function(this: ITraceTransaction): Int64; cdecl;
 	ITraceParams_getCountPtr = function(this: ITraceParams): Cardinal; cdecl;
 	ITraceParams_getParamPtr = function(this: ITraceParams; idx: Cardinal): dscPtr; cdecl;
 	ITraceParams_getTextUTF8Ptr = function(this: ITraceParams; status: IStatus; idx: Cardinal): PAnsiChar; cdecl;
@@ -515,6 +517,7 @@ type
 	ITraceSweepInfo_getNextPtr = function(this: ITraceSweepInfo): Int64; cdecl;
 	ITraceSweepInfo_getPerfPtr = function(this: ITraceSweepInfo): PerformanceInfoPtr; cdecl;
 	ITraceLogWriter_writePtr = function(this: ITraceLogWriter; buf: Pointer; size: Cardinal): Cardinal; cdecl;
+	ITraceLogWriter_write_sPtr = function(this: ITraceLogWriter; status: IStatus; buf: Pointer; size: Cardinal): Cardinal; cdecl;
 	ITraceInitInfo_getConfigTextPtr = function(this: ITraceInitInfo): PAnsiChar; cdecl;
 	ITraceInitInfo_getTraceSessionIDPtr = function(this: ITraceInitInfo): Integer; cdecl;
 	ITraceInitInfo_getTraceSessionNamePtr = function(this: ITraceInitInfo): PAnsiChar; cdecl;
@@ -2519,10 +2522,12 @@ type
 		getWait: ITraceTransaction_getWaitPtr;
 		getIsolation: ITraceTransaction_getIsolationPtr;
 		getPerf: ITraceTransaction_getPerfPtr;
+		getInitialID: ITraceTransaction_getInitialIDPtr;
+		getPreviousID: ITraceTransaction_getPreviousIDPtr;
 	end;
 
 	ITraceTransaction = class(IVersioned)
-		const VERSION = 5;
+		const VERSION = 7;
 		const ISOLATION_CONSISTENCY = Cardinal(1);
 		const ISOLATION_CONCURRENCY = Cardinal(2);
 		const ISOLATION_READ_COMMITTED_RECVER = Cardinal(3);
@@ -2533,6 +2538,8 @@ type
 		function getWait(): Integer;
 		function getIsolation(): Cardinal;
 		function getPerf(): PerformanceInfoPtr;
+		function getInitialID(): Int64;
+		function getPreviousID(): Int64;
 	end;
 
 	ITraceTransactionImpl = class(ITraceTransaction)
@@ -2543,6 +2550,8 @@ type
 		function getWait(): Integer; virtual; abstract;
 		function getIsolation(): Cardinal; virtual; abstract;
 		function getPerf(): PerformanceInfoPtr; virtual; abstract;
+		function getInitialID(): Int64; virtual; abstract;
+		function getPreviousID(): Int64; virtual; abstract;
 	end;
 
 	TraceParamsVTable = class(VersionedVTable)
@@ -2848,12 +2857,14 @@ type
 
 	TraceLogWriterVTable = class(ReferenceCountedVTable)
 		write: ITraceLogWriter_writePtr;
+		write_s: ITraceLogWriter_write_sPtr;
 	end;
 
 	ITraceLogWriter = class(IReferenceCounted)
-		const VERSION = 3;
+		const VERSION = 4;
 
 		function write(buf: Pointer; size: Cardinal): Cardinal;
+		function write_s(status: IStatus; buf: Pointer; size: Cardinal): Cardinal;
 	end;
 
 	ITraceLogWriterImpl = class(ITraceLogWriter)
@@ -2862,6 +2873,7 @@ type
 		procedure addRef(); virtual; abstract;
 		function release(): Integer; virtual; abstract;
 		function write(buf: Pointer; size: Cardinal): Cardinal; virtual; abstract;
+		function write_s(status: IStatus; buf: Pointer; size: Cardinal): Cardinal; virtual; abstract;
 	end;
 
 	TraceInitInfoVTable = class(VersionedVTable)
@@ -4731,6 +4743,9 @@ const
 	isc_fbsvcmgr_fp_read                 = 336986161;
 	isc_fbsvcmgr_fp_empty                = 336986162;
 	isc_fbsvcmgr_bad_arg                 = 336986164;
+	isc_fbsvcmgr_info_limbo              = 336986170;
+	isc_fbsvcmgr_limbo_state             = 336986171;
+	isc_fbsvcmgr_limbo_advise            = 336986172;
 	isc_utl_trusted_switch               = 337051649;
 	isc_nbackup_missing_param            = 337117213;
 	isc_nbackup_allowed_switches         = 337117214;
@@ -6599,6 +6614,16 @@ begin
 	Result := TraceTransactionVTable(vTable).getPerf(Self);
 end;
 
+function ITraceTransaction.getInitialID(): Int64;
+begin
+	Result := TraceTransactionVTable(vTable).getInitialID(Self);
+end;
+
+function ITraceTransaction.getPreviousID(): Int64;
+begin
+	Result := TraceTransactionVTable(vTable).getPreviousID(Self);
+end;
+
 function ITraceParams.getCount(): Cardinal;
 begin
 	Result := TraceParamsVTable(vTable).getCount(Self);
@@ -6818,6 +6843,12 @@ end;
 function ITraceLogWriter.write(buf: Pointer; size: Cardinal): Cardinal;
 begin
 	Result := TraceLogWriterVTable(vTable).write(Self, buf, size);
+end;
+
+function ITraceLogWriter.write_s(status: IStatus; buf: Pointer; size: Cardinal): Cardinal;
+begin
+	Result := TraceLogWriterVTable(vTable).write_s(Self, status, buf, size);
+	FbException.checkException(status);
 end;
 
 function ITraceInitInfo.getConfigText(): PAnsiChar;
@@ -11313,6 +11344,24 @@ begin
 	end
 end;
 
+function ITraceTransactionImpl_getInitialIDDispatcher(this: ITraceTransaction): Int64; cdecl;
+begin
+	try
+		Result := ITraceTransactionImpl(this).getInitialID();
+	except
+		on e: Exception do FbException.catchException(nil, e);
+	end
+end;
+
+function ITraceTransactionImpl_getPreviousIDDispatcher(this: ITraceTransaction): Int64; cdecl;
+begin
+	try
+		Result := ITraceTransactionImpl(this).getPreviousID();
+	except
+		on e: Exception do FbException.catchException(nil, e);
+	end
+end;
+
 var
 	ITraceTransactionImpl_vTable: TraceTransactionVTable;
 
@@ -11945,6 +11994,15 @@ begin
 		Result := ITraceLogWriterImpl(this).write(buf, size);
 	except
 		on e: Exception do FbException.catchException(nil, e);
+	end
+end;
+
+function ITraceLogWriterImpl_write_sDispatcher(this: ITraceLogWriter; status: IStatus; buf: Pointer; size: Cardinal): Cardinal; cdecl;
+begin
+	try
+		Result := ITraceLogWriterImpl(this).write_s(status, buf, size);
+	except
+		on e: Exception do FbException.catchException(status, e);
 	end
 end;
 
@@ -13104,12 +13162,14 @@ initialization
 	ITraceDatabaseConnectionImpl_vTable.getDatabaseName := @ITraceDatabaseConnectionImpl_getDatabaseNameDispatcher;
 
 	ITraceTransactionImpl_vTable := TraceTransactionVTable.create;
-	ITraceTransactionImpl_vTable.version := 5;
+	ITraceTransactionImpl_vTable.version := 7;
 	ITraceTransactionImpl_vTable.getTransactionID := @ITraceTransactionImpl_getTransactionIDDispatcher;
 	ITraceTransactionImpl_vTable.getReadOnly := @ITraceTransactionImpl_getReadOnlyDispatcher;
 	ITraceTransactionImpl_vTable.getWait := @ITraceTransactionImpl_getWaitDispatcher;
 	ITraceTransactionImpl_vTable.getIsolation := @ITraceTransactionImpl_getIsolationDispatcher;
 	ITraceTransactionImpl_vTable.getPerf := @ITraceTransactionImpl_getPerfDispatcher;
+	ITraceTransactionImpl_vTable.getInitialID := @ITraceTransactionImpl_getInitialIDDispatcher;
+	ITraceTransactionImpl_vTable.getPreviousID := @ITraceTransactionImpl_getPreviousIDDispatcher;
 
 	ITraceParamsImpl_vTable := TraceParamsVTable.create;
 	ITraceParamsImpl_vTable.version := 3;
@@ -13204,10 +13264,11 @@ initialization
 	ITraceSweepInfoImpl_vTable.getPerf := @ITraceSweepInfoImpl_getPerfDispatcher;
 
 	ITraceLogWriterImpl_vTable := TraceLogWriterVTable.create;
-	ITraceLogWriterImpl_vTable.version := 3;
+	ITraceLogWriterImpl_vTable.version := 4;
 	ITraceLogWriterImpl_vTable.addRef := @ITraceLogWriterImpl_addRefDispatcher;
 	ITraceLogWriterImpl_vTable.release := @ITraceLogWriterImpl_releaseDispatcher;
 	ITraceLogWriterImpl_vTable.write := @ITraceLogWriterImpl_writeDispatcher;
+	ITraceLogWriterImpl_vTable.write_s := @ITraceLogWriterImpl_write_sDispatcher;
 
 	ITraceInitInfoImpl_vTable := TraceInitInfoVTable.create;
 	ITraceInitInfoImpl_vTable.version := 7;

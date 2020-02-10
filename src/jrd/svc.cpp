@@ -1361,11 +1361,13 @@ ISC_STATUS Service::query2(thread_db* /*tdbb*/,
 		case isc_info_svc_user_dbpath:
 			if (svc_user_flag & SVC_user_dba)
 			{
-				// The path to the user security database (security2.fdb)
-				const RefPtr<const Config> defConf(Config::getDefaultConfig());
-				const char* secDb = defConf->getSecurityDatabase();
+				// The path to the user security database
+				PathName secDb;
+				RefPtr<const Config> config;
+				expandDatabaseName(svc_expected_db, secDb, &config);
+				expandDatabaseName(config->getSecurityDatabase(), secDb, NULL);
 
-				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(secDb)), secDb, info, end)))
+				if (!(info = INF_put_item(item, static_cast<USHORT>(secDb.length()), secDb.c_str(), info, end)))
 				{
 					return 0;
 				}
@@ -1813,11 +1815,13 @@ void Service::query(USHORT			send_item_length,
 		case isc_info_svc_user_dbpath:
             if (svc_user_flag & SVC_user_dba)
             {
-				// The path to the user security database (security2.fdb)
-				const RefPtr<const Config> defConf(Config::getDefaultConfig());
-				const char* secDb = defConf->getSecurityDatabase();
+				// The path to the user security database
+				PathName secDb;
+				RefPtr<const Config> config;
+				expandDatabaseName(svc_expected_db, secDb, &config);
+				expandDatabaseName(config->getSecurityDatabase(), secDb, NULL);
 
-				if (!(info = INF_put_item(item, static_cast<USHORT>(strlen(secDb)), secDb, info, end)))
+				if (!(info = INF_put_item(item, static_cast<USHORT>(secDb.length()), secDb.c_str(), info, end)))
 				{
 					return;
 				}
@@ -3199,4 +3203,9 @@ const char* Service::getServiceMgr() const
 const char* Service::getServiceName() const
 {
 	return svc_service_run ? svc_service_run->serv_name : NULL;
+}
+
+bool Service::getUserAdminFlag() const
+{
+	return (svc_user_flag & SVC_user_dba);
 }

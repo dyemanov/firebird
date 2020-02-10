@@ -38,6 +38,7 @@
 #include "../../jrd/trace/TraceLog.h"
 #include "../../jrd/trace/TraceManager.h"
 #include "../../jrd/trace/TraceService.h"
+#include "../../jrd/Mapping.h"
 
 using namespace Firebird;
 using namespace Jrd;
@@ -55,7 +56,7 @@ public:
 	virtual ~TraceSvcJrd() {};
 
 	virtual void setAttachInfo(const string& service_name, const string& user, const string& pwd,
-		const AuthReader::AuthBlock& authBlock, bool isAdmin);
+		bool trusted);
 
 	virtual void startSession(TraceSession& session, bool interactive);
 	virtual void stopSession(ULONG id);
@@ -67,6 +68,9 @@ private:
 	bool changeFlags(ULONG id, int setFlags, int clearFlags);
 	bool checkAliveAndFlags(ULONG sesId, int& flags);
 
+	// Check if current service is allowed to list\stop given other session
+	bool checkPrivileges(TraceSession& session);
+
 	Service& m_svc;
 	string m_user;
 	AuthReader::AuthBlock m_authBlock;
@@ -74,12 +78,21 @@ private:
 	ULONG  m_chg_number;
 };
 
-void TraceSvcJrd::setAttachInfo(const string& /*svc_name*/, const string& user, const string& pwd,
-	const AuthReader::AuthBlock& authBlock, bool isAdmin)
+void TraceSvcJrd::setAttachInfo(const string& /*svc_name*/, const string& user, const string& /*pwd*/,
+	bool /*trusted*/)
 {
-	m_authBlock = authBlock;
-	m_user = user;
-	m_admin = isAdmin || (m_user == SYSDBA_USER_NAME);
+	const unsigned char* bytes;
+	unsigned int authBlockSize = m_svc.getAuthBlock(&bytes);
+	if (authBlockSize)
+	{
+		m_authBlock.add(bytes, authBlockSize);
+		m_user = "";
+	}
+	else
+	{
+		m_user = user;
+		m_admin = (m_user == SYSDBA_USER_NAME);
+	}
 }
 
 void TraceSvcJrd::startSession(TraceSession& session, bool interactive)
@@ -96,7 +109,7 @@ void TraceSvcJrd::startSession(TraceSession& session, bool interactive)
 		StorageGuard guard(storage);
 
 		session.ses_auth = m_authBlock;
-		session.ses_user = m_user;
+		session.ses_user = m_user.hasData() ? m_user : m_svc.getUserName();
 
 		session.ses_flags = trs_active;
 		if (m_admin) {
@@ -146,7 +159,7 @@ void TraceSvcJrd::stopSession(ULONG id)
 		if (id != session.ses_id)
 			continue;
 
-		if (m_admin || m_user == session.ses_user)
+		if (checkPrivileges(session))
 		{
 			storage->removeSession(id);
 			m_svc.printf(false, "Trace session ID %ld stopped\n", id);
@@ -189,7 +202,7 @@ bool TraceSvcJrd::changeFlags(ULONG id, int setFlags, int clearFlags)
 		if (id != session.ses_id)
 			continue;
 
-		if (m_admin || m_user == session.ses_user)
+		if (checkPrivileges(session))
 		{
 			const int saveFlags = session.ses_flags;
 
@@ -223,7 +236,7 @@ void TraceSvcJrd::listSessions()
 	TraceSession session(*getDefaultMemoryPool());
 	while (storage->getNextSession(session))
 	{
-		if (m_admin || m_user == session.ses_user)
+		if (checkPrivileges(session))
 		{
 			m_svc.printf(false, "\nSession ID: %d\n", session.ses_id);
 			if (!session.ses_name.empty()) {
@@ -331,6 +344,45 @@ bool TraceSvcJrd::checkAliveAndFlags(ULONG sesId, int& flags)
 	return alive;
 }
 
+bool TraceSvcJrd::checkPrivileges(TraceSession& session)
+{
+	// Our service run in embedded mode and have no auth info - trust user name as is
+	if (m_admin || m_user.hasData() && (m_user == session.ses_user))
+		return true;
+
+	// Other session is fully authorized - try to map our auth info using other's 
+	// security database
+	if (session.ses_auth.hasData())
+	{
+		AuthReader::Info info;
+		for (AuthReader rdr(session.ses_auth); rdr.getInfo(info); rdr.moveNext())
+		{
+			const char* secDb = info.secDb.hasData() ? info.secDb.c_str() :
+				Config::getDefaultConfig()->getSecurityDatabase();
+			string s_user, t_role;
+
+			try
+			{
+				mapUser(s_user, t_role, NULL, NULL, m_authBlock, "services manager", 
+					NULL, secDb, m_svc.getCryptCallback(), NULL);
+			}
+			catch (const Firebird::Exception&)
+			{
+				// Error in mapUser() means missing context, therefore...
+				continue;
+			}
+
+			t_role.upper();
+			if (s_user == SYSDBA_USER_NAME || t_role == ADMIN_ROLE || s_user == session.ses_user)
+				return true;
+		}
+	}
+	// Other session's service run in embedded mode - check our user name as is
+	else if (m_svc.getUserName() == session.ses_user || m_svc.getUserAdminFlag())
+		return true;
+
+	return false;
+}
 
 // service entrypoint
 int TRACE_main(UtilSvc* arg)

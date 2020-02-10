@@ -296,7 +296,7 @@ void SCL_check_create_access(thread_db* tdbb, int type)
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	// Allow the locksmith any access to database
-	if (attachment->locksmith())
+	if ((tdbb->tdbb_flags & TDBB_trusted_ddl) || attachment->locksmith())
 		return;
 
 	const SecurityClass::flags_t obj_mask = SCL_get_object_mask(type);
@@ -436,7 +436,7 @@ void SCL_check_domain(thread_db* tdbb, const MetaName& name, SecurityClass::flag
 }
 
 
-void SCL_check_exception(thread_db* tdbb, const MetaName& name, SecurityClass::flags_t mask)
+bool SCL_check_exception(thread_db* tdbb, const MetaName& name, SecurityClass::flags_t mask)
 {
 /**************************************
  *
@@ -452,6 +452,7 @@ void SCL_check_exception(thread_db* tdbb, const MetaName& name, SecurityClass::f
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	const SecurityClass* s_class = NULL;
+	bool found = false;
 	AutoCacheRequest request(tdbb, irq_exc_security, IRQ_REQUESTS);
 
 	FOR (REQUEST_HANDLE request)
@@ -460,14 +461,16 @@ void SCL_check_exception(thread_db* tdbb, const MetaName& name, SecurityClass::f
 	{
 		if (!XCP.RDB$SECURITY_CLASS.NULL)
 			s_class = SCL_get_class(tdbb, XCP.RDB$SECURITY_CLASS);
+		found = true;
 	}
 	END_FOR
 
 	SCL_check_access(tdbb, s_class, 0, 0, name, mask, SCL_object_exception, false, name);
+	return found;
 }
 
 
-void SCL_check_generator(thread_db* tdbb, const MetaName& name, SecurityClass::flags_t mask)
+bool SCL_check_generator(thread_db* tdbb, const MetaName& name, SecurityClass::flags_t mask)
 {
 /**************************************
  *
@@ -483,6 +486,7 @@ void SCL_check_generator(thread_db* tdbb, const MetaName& name, SecurityClass::f
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	const SecurityClass* s_class = NULL;
+	bool found = false;
 	AutoCacheRequest request(tdbb, irq_gen_security, IRQ_REQUESTS);
 
 	FOR (REQUEST_HANDLE request)
@@ -491,10 +495,12 @@ void SCL_check_generator(thread_db* tdbb, const MetaName& name, SecurityClass::f
 	{
 		if (!GEN.RDB$SECURITY_CLASS.NULL)
 			s_class = SCL_get_class(tdbb, GEN.RDB$SECURITY_CLASS);
+		found = true;
 	}
 	END_FOR
 
 	SCL_check_access(tdbb, s_class, 0, 0, name, mask, SCL_object_generator, false, name);
+	return found;
 }
 
 
@@ -616,7 +622,7 @@ void SCL_check_index(thread_db* tdbb, const Firebird::MetaName& index_name, UCHA
 }
 
 
-void SCL_check_package(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
+bool SCL_check_package(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
 {
 /**************************************
  *
@@ -640,6 +646,7 @@ void SCL_check_package(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flag
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	const SecurityClass* s_class = NULL;
+	bool found = false;
 	AutoCacheRequest request(tdbb, irq_pkg_security, IRQ_REQUESTS);
 
 	FOR (REQUEST_HANDLE request)
@@ -648,14 +655,16 @@ void SCL_check_package(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flag
 	{
 		if (!PKG.RDB$SECURITY_CLASS.NULL)
 			s_class = SCL_get_class(tdbb, PKG.RDB$SECURITY_CLASS);
+		found = true;
 	}
 	END_FOR
 
 	SCL_check_access(tdbb, s_class, 0, id_package, name, mask, SCL_object_package, false, name);
+	return found;
 }
 
 
-void SCL_check_procedure(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
+bool SCL_check_procedure(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
 {
 /**************************************
  *
@@ -679,6 +688,7 @@ void SCL_check_procedure(thread_db* tdbb, const dsc* dsc_name, SecurityClass::fl
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	const SecurityClass* s_class = NULL;
+	bool found = false;
 	AutoCacheRequest request(tdbb, irq_p_security, IRQ_REQUESTS);
 
 	FOR (REQUEST_HANDLE request)
@@ -688,14 +698,16 @@ void SCL_check_procedure(thread_db* tdbb, const dsc* dsc_name, SecurityClass::fl
 	{
 		if (!SPROC.RDB$SECURITY_CLASS.NULL)
 			s_class = SCL_get_class(tdbb, SPROC.RDB$SECURITY_CLASS);
+		found = true;
 	}
 	END_FOR
 
 	SCL_check_access(tdbb, s_class, 0, id_procedure, name, mask, SCL_object_procedure, false, name);
+	return found;
 }
 
 
-void SCL_check_function(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
+bool SCL_check_function(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
 {
 /**************************************
  *
@@ -719,6 +731,7 @@ void SCL_check_function(thread_db* tdbb, const dsc* dsc_name, SecurityClass::fla
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	const SecurityClass* s_class = NULL;
+	bool found = false;
 	AutoCacheRequest request(tdbb, irq_f_security, IRQ_REQUESTS);
 
 	FOR (REQUEST_HANDLE request)
@@ -728,10 +741,12 @@ void SCL_check_function(thread_db* tdbb, const dsc* dsc_name, SecurityClass::fla
 	{
 		if (!SFUN.RDB$SECURITY_CLASS.NULL)
 			s_class = SCL_get_class(tdbb, SFUN.RDB$SECURITY_CLASS);
+		found = true;
 	}
 	END_FOR
 
 	SCL_check_access(tdbb, s_class, 0, id_function, name, mask, SCL_object_function, false, name);
+	return found;
 }
 
 
@@ -814,7 +829,7 @@ void SCL_check_relation(thread_db* tdbb, const dsc* dsc_name, SecurityClass::fla
 	SCL_check_access(tdbb, s_class, 0, 0, NULL, mask, SCL_object_table, false, name);
 }
 
-void SCL_check_view(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
+bool SCL_check_view(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t mask)
 {
 /**************************************
  *
@@ -838,6 +853,7 @@ void SCL_check_view(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t
 	Jrd::Attachment* const attachment = tdbb->getAttachment();
 
 	const SecurityClass* s_class = NULL;
+	bool found = false;
 	AutoCacheRequest request(tdbb, irq_v_security_v, IRQ_REQUESTS);
 
 	FOR(REQUEST_HANDLE request) REL IN RDB$RELATIONS
@@ -847,10 +863,12 @@ void SCL_check_view(thread_db* tdbb, const dsc* dsc_name, SecurityClass::flags_t
 		{
 			s_class = SCL_get_class(tdbb, REL.RDB$SECURITY_CLASS);
 		}
+		found = true;
 	}
 	END_FOR
 
 	SCL_check_access(tdbb, s_class, 0, 0, NULL, mask, SCL_object_view, false, name);
+	return found;
 }
 
 void SCL_check_role(thread_db* tdbb, const Firebird::MetaName& name, SecurityClass::flags_t mask)
@@ -1297,7 +1315,7 @@ SecurityClass::flags_t SCL_get_object_mask(const int object_type)
 	if (!*object_name)
 		return 0;
 
-	const Jrd::SecurityClass* s_class = SCL_recompute_class(tdbb, object_name);
+	const Jrd::SecurityClass* s_class = SCL_get_class(tdbb, object_name);
 	if (s_class)
 		return s_class->scl_flags;
 
@@ -1721,6 +1739,6 @@ void Jrd::UserId::populateDpb(Firebird::ClumpletWriter& dpb, bool embeddedSuppor
 	else if (embeddedSupport)
 		dpb.insertString(isc_dpb_user_name, usr_user_name);
 
-	if (usr_sql_role_name.hasData())
+	if (usr_sql_role_name.hasData() && usr_sql_role_name != NULL_ROLE && !dpb.find(isc_dpb_sql_role_name))
 		dpb.insertString(isc_dpb_sql_role_name, usr_sql_role_name);
 }

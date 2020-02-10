@@ -816,7 +816,7 @@ void DPM_delete( thread_db* tdbb, record_param* rpb, ULONG prior_page)
 
 	for (;;)
 	{
-		relPages = rpb->rpb_relation->getPages(tdbb, rpb->rpb_transaction_nr);
+		relPages = rpb->rpb_relation->getPages(tdbb);
 		pwindow = WIN(relPages->rel_pg_space_id, -1);
 
 		if (!(ppage = get_pointer_page(tdbb, rpb->rpb_relation, relPages, &pwindow,
@@ -3250,7 +3250,7 @@ static rhd* locate_space(thread_db* tdbb,
 	CHECK_DBB(dbb);
 
 	jrd_rel* relation = rpb->rpb_relation;
-	RelationPages* relPages = relation->getPages(tdbb, rpb->rpb_transaction_nr);
+	RelationPages* relPages = relation->getPages(tdbb);
 	WIN* window = &rpb->getWindow(tdbb);
 
 	// If there is a preferred page, try there first

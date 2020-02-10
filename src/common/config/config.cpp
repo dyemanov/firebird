@@ -136,6 +136,7 @@ const Config::ConfigEntry Config::entries[MAX_CONFIG_KEY] =
 	{TYPE_INTEGER,		"CpuAffinityMask",			(ConfigValue) 0},
 	{TYPE_INTEGER,		"TcpRemoteBufferSize",		(ConfigValue) 8192},		// bytes
 	{TYPE_BOOLEAN,		"TcpNoNagle",				(ConfigValue) true},
+	{TYPE_BOOLEAN,		"TcpLoopbackFastPath",      (ConfigValue) true},
 	{TYPE_INTEGER,		"DefaultDbCachePages",		(ConfigValue) -1},			// pages
 	{TYPE_INTEGER,		"ConnectionTimeout",		(ConfigValue) 180},			// seconds
 	{TYPE_INTEGER,		"DummyPacketInterval",		(ConfigValue) 0},			// seconds
@@ -187,15 +188,16 @@ const Config::ConfigEntry Config::entries[MAX_CONFIG_KEY] =
 #endif
 	{TYPE_STRING,		"UserManager",				(ConfigValue) "Srp"},
 	{TYPE_STRING,		"TracePlugin",				(ConfigValue) "fbtrace"},
-	{TYPE_STRING,		"SecurityDatabase",			(ConfigValue) "$(dir_secDb)/security3.fdb"},	// security database name
-	{TYPE_STRING,		"ServerMode",				(ConfigValue) "Super"},
+	{TYPE_STRING,		"SecurityDatabase",			(ConfigValue) "security.db"},	// sec/db alias - rely on databases.conf
+	{TYPE_STRING,		"ServerMode",				(ConfigValue) ""},		// actual value differs in boot/regular cases
 	{TYPE_STRING,		"WireCrypt",				(ConfigValue) NULL},
 	{TYPE_STRING,		"WireCryptPlugin",			(ConfigValue) "Arc4"},
 	{TYPE_STRING,		"KeyHolderPlugin",			(ConfigValue) ""},
 	{TYPE_BOOLEAN,		"RemoteAccess",				(ConfigValue) true},
 	{TYPE_BOOLEAN,		"IPv6V6Only",				(ConfigValue) false},
 	{TYPE_BOOLEAN,		"WireCompression",			(ConfigValue) false},
-	{TYPE_BOOLEAN,		"AllowEncryptedSecurityDatabase", (ConfigValue) false}
+	{TYPE_BOOLEAN,		"AllowEncryptedSecurityDatabase", (ConfigValue) false},
+	{TYPE_BOOLEAN,		"ClearGTTAtRetaining",		(ConfigValue) true}
 };
 
 /******************************************************************************
@@ -461,6 +463,11 @@ bool Config::getTcpNoNagle() const
 	return get<bool>(KEY_TCP_NO_NAGLE);
 }
 
+bool Config::getTcpLoopbackFastPath() const
+{
+	return get<bool>(KEY_TCP_LOOPBACK_FAST_PATH);
+}
+
 bool Config::getIPv6V6Only() const
 {
 	return get<bool>(KEY_IPV6_V6ONLY);
@@ -700,7 +707,7 @@ int Config::getServerMode()
 	}
 
 	// use default
-	rc = MODE_SUPER;
+	rc = fb_utils::bootBuild() ? MODE_CLASSIC : MODE_SUPER;
 	return rc;
 }
 
@@ -795,4 +802,9 @@ bool Config::getWireCompression() const
 bool Config::getCryptSecurityDatabase() const
 {
 	return get<bool>(KEY_ENCRYPT_SECURITY_DATABASE);
+}
+
+bool Config::getClearGTTAtRetaining() const
+{
+	return get<bool>(KEY_CLEAR_GTT_RETAINING);
 }

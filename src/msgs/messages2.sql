@@ -2349,7 +2349,7 @@ ERROR: Backup incomplete', NULL, NULL);
 (NULL, 'write_secclasses', 'backup.epp', NULL, 12, 347, NULL, 'writing security classes', NULL, NULL);
 ('gbak_db_format_too_old2', 'BACKUP_backup', 'backup.epp', NULL, 12, 348, NULL, 'database format @1 is too old to backup', NULL, NULL);
 (NULL, 'restore', 'restore.epp', NULL, 12, 349, NULL, 'backup version is @1', NULL, NULL);
-(NULL, 'fix_system_generators', 'restore.epp', NULL, 12, 350, NULL, 'fixing system generators', NULL, NULL);
+(NULL, 'fix_system_generators', 'restore.epp', NULL, 12, 350, NULL, 'adjusting system generators', NULL, NULL);
 (NULL, 'BURP_abort', 'burp.cpp', NULL, 12, 351, NULL, 'Error closing database, but backup file is OK', NULL, NULL);
 (NULL, NULL, 'restore.epp', NULL, 12, 352, NULL, 'database', NULL, NULL);
 (NULL, 'get_mapping', 'restore.epp', NULL, 12, 353, NULL, 'required mapping attributes are missing in backup file', NULL, NULL);
@@ -2369,6 +2369,32 @@ ERROR: Backup incomplete', NULL, NULL);
 ('gbak_wrong_perf', 'api_gbak/gbak', 'burp.cpp', NULL, 12, 367, NULL, 'wrong char "@1" at statistics parameter', NULL, NULL);
 ('gbak_too_long_perf', 'api_gbak/gbak', 'burp.cpp', NULL, 12, 368, NULL, 'too many chars at statistics parameter', NULL, NULL);
 (NULL, 'api_gbak/gbak', 'burp.cpp', NULL, 12, 369, NULL, 'total statistics', NULL, NULL);
+(NULL, 'get_blob', 'restore.epp', NULL, 12, 370, NULL, 'could not append BLOB data to batch', NULL, NULL);
+(NULL, 'get_data', 'restore.epp', NULL, 12, 371, NULL, 'could not start batch when restoring table @1, trying old way', NULL, NULL);
+(NULL, 'burp_usage', 'burp.cpp', NULL, 12, 372, NULL, '    @1KEYNAME              name of a key to be used for encryption', NULL, NULL);
+(NULL, 'burp_usage', 'burp.cpp', NULL, 12, 373, NULL, '    @1CRYPT                crypt plugin name', NULL, NULL);
+(NULL, 'burp_usage', 'burp.cpp', NULL, 12, 374, NULL, '    @1ZIP                  backup file is in zip compressed format', NULL, NULL);
+(NULL, 'gbak', 'burp.cpp', NULL, 12, 375, NULL, 'Keyname parameter missing', NULL, NULL);
+(NULL, 'gbak', 'burp.cpp', NULL, 12, 376, NULL, 'Key holder parameter missing but backup file is encrypted', NULL, NULL);
+(NULL, 'gbak', 'mvol.cpp', NULL, 12, 377, NULL, 'CryptPlugin parameter missing', NULL, NULL);
+(NULL, 'gbak', 'burp.cpp', NULL, 12, 378, NULL, 'Unknown crypt plugin name - use -CRYPT switch', NULL, NULL);
+(NULL, NULL, 'mvol.cpp', NULL, 12, 379, NULL, 'Inflate error @1', NULL, NULL);
+(NULL, NULL, 'mvol.cpp', NULL, 12, 380, NULL, 'Deflate error @1', NULL, NULL);
+(NULL, 'gbak', 'burp.cpp', NULL, 12, 381, NULL, 'Key holder parameter missing', NULL, NULL);
+(NULL, 'burp_usage', 'burp.cpp', NULL, 12, 382, NULL, '    @1KEYHOLDER            name of a key holder plugin', NULL, NULL);
+(NULL, NULL, 'mvol.cpp', NULL, 12, 383, NULL, 'Decompression stream init error @1', NULL, NULL);
+(NULL, NULL, 'mvol.cpp', NULL, 12, 384, NULL, 'Compression stream init error @1', NULL, NULL);
+(NULL, NULL, 'restore.epp', NULL, 12, 385, NULL, 'Invalid reply from getInfo() when waiting for DB encryption', NULL, NULL);
+(NULL, NULL, 'restore.epp', NULL, 12, 386, NULL, 'Problems with just created database encryption', NULL, NULL);
+(NULL, 'get_trigger', 'restore.epp', NULL, 12, 387, NULL, 'Skipped trigger @1 on system table @2', NULL, NULL);
+(NULL, 'burp_usage', 'burp.c', NULL, 12, 388, NULL, '    @1INCLUDE(_DATA)       backup data of table(s)', NULL, NULL);
+(NULL, NULL, 'burp.cpp', NULL, 12, 389, NULL, 'missing regular expression to include tables', NULL, NULL);
+(NULL, NULL, 'burp.cpp', NULL, 12, 390, NULL, 'regular expression to include tables was already set', NULL, NULL);
+(NULL, 'BACKUP_backup', 'backup.epp', NULL, 12, 391, NULL, 'writing database create grants', NULL, NULL);
+(NULL, 'write_db_creators', 'backup.epp', NULL, 12, 392, NULL, '    database create grant for @1', NULL, NULL);
+(NULL, 'get_db_creators', 'restore.epp', NULL, 12, 393, NULL, '    restoring database create grant for @1', NULL, NULL);
+(NULL, 'get_db_creators', 'restore.epp', NULL, 12, 394, NULL, 'restoring database create grants', NULL, NULL);
+(NULL, 'get_db_creators', 'restore.epp', NULL, 12, 395, NULL, 'database create grant', NULL, NULL);
 -- SQLERR
 (NULL, NULL, NULL, NULL, 13, 1, NULL, 'Firebird error', NULL, NULL);
 (NULL, NULL, NULL, NULL, 13, 74, NULL, 'Rollback not performed', NULL, NULL);
@@ -3239,6 +3265,8 @@ Analyzing database pages ...', NULL, NULL);
 (NULL, 'main', 'dba.epp', NULL, 21, 58, NULL, 'Other pages: total @1, ENCRYPTED @2 (DB problem!), non-crypted @3', NULL, NULL)
 (NULL, 'main', 'dba.epp', NULL, 21, 59, NULL, 'Gstat execution time @1', NULL, NULL)
 (NULL, 'main', 'dba.epp', NULL, 21, 60, NULL, 'Gstat completion time @1', NULL, NULL)
+(NULL, 'lastUsedPage', 'dba.epp', NULL, 21, 61, NULL, '    Expected page inventory page @1', NULL, NULL);
+(NULL, 'main', 'dba.epp', NULL, 21, 62, NULL, 'Generator pages: total @1, encrypted @2, non-crypted @3', NULL, NULL)
 -- FBSVCMGR
 -- All messages use the new format.
 ('fbsvcmgr_bad_am', 'putAccessMode', 'fbsvcmgr.cpp', NULL, 22, 1, NULL, 'Wrong value for access mode', NULL, NULL);
@@ -3274,16 +3302,16 @@ Analyzing database pages ...', NULL, NULL);
 (NULL, 'usage', 'fbsvcmgr.cpp', NULL, 22, 31, NULL, '  (will list header info in database employee on local machine)', NULL, NULL);
 (NULL, 'usage', 'fbsvcmgr.cpp', NULL, 22, 32, NULL, 'fbsvcmgr yourserver:service_mgr user sysdba password masterkey info_server_version info_svr_db_info', NULL, NULL);
 (NULL, 'usage', 'fbsvcmgr.cpp', NULL, 22, 33, NULL, '  (will show firebird version and databases usage on yourserver)', NULL, NULL);
-(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 34, NULL, 'Transaction @1 is in limbo', NULL, NULL);
-(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 35, NULL, 'Multidatabase transaction @1 is in limbo', NULL, NULL);
-(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 36, NULL, 'Host Site: @1', NULL, NULL);
-(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 37, NULL, 'Transaction @1', NULL, NULL);
+(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 34, NULL, 'Transaction in limbo', NULL, NULL);
+(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 35, NULL, 'Multidatabase transaction in limbo', NULL, NULL);
+(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 36, NULL, 'Host Site', NULL, NULL);
+(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 37, NULL, 'Transaction', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 38, NULL, 'has been prepared', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 39, NULL, 'has been committed', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 40, NULL, 'has been rolled back', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 41, NULL, 'is not available', NULL, NULL);
-(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 42, NULL, 'Remote Site: @1', NULL, NULL);
-(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 43, NULL, 'Database Path: @1', NULL, NULL);
+(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 42, NULL, 'Remote Site', NULL, NULL);
+(NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 43, NULL, 'Database Path', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 44, NULL, 'Automated recovery would commit this transaction', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 45, NULL, 'Automated recovery would rollback this transaction', NULL, NULL);
 (NULL, 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 46, NULL, 'No idea should it be commited or rolled back', NULL, NULL);
@@ -3298,6 +3326,9 @@ Analyzing database pages ...', NULL, NULL);
 (NULL, 'usage', 'fbsvcmgr.cpp', NULL, 22, 55, NULL, 'Information requests:', NULL, NULL);
 (NULL, 'usage', 'fbsvcmgr.cpp', NULL, 22, 56, NULL, 'Actions:', NULL, NULL);
 (NULL, 'printCapabilities', 'fbsvcmgr.cpp', NULL, 22, 57, NULL, 'Server capabilities:', NULL, NULL);
+('fbsvcmgr_info_limbo', 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 58, NULL, 'Unknown tag (@1) in isc_info_svc_limbo_trans block after isc_svc_query()', NULL, NULL);
+('fbsvcmgr_limbo_state', 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 59, NULL, 'Unknown tag (@1) in isc_spb_tra_state block after isc_svc_query()', NULL, NULL);
+('fbsvcmgr_limbo_advise', 'printInfo', 'fbsvcmgr.cpp', NULL, 22, 60, NULL, 'Unknown tag (@1) in isc_spb_tra_advise block after isc_svc_query()', NULL, NULL);
 -- UTL (messages common for many utilities)
 -- All messages use the new format.
 ('utl_trusted_switch', 'checkService', 'UtilSvc.cpp', NULL, 23, 1, NULL, 'Switches trusted_user and trusted_role are not supported from command line', NULL, NULL);

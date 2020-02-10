@@ -211,6 +211,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\auth\SecDbCache.cpp" />
     <ClCompile Include="..\..\..\src\auth\SecureRemotePassword\server\SrpServer.cpp" />
     <ClCompile Include="..\..\..\src\remote\server\os\win32\chop.cpp" />
     <ClCompile Include="..\..\..\src\remote\server\os\win32\cntl.cpp" />

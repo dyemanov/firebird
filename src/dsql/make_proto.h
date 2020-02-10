@@ -60,6 +60,7 @@ Jrd::ValueExprNode* MAKE_constant(const char*, Jrd::dsql_constant_type);
 Jrd::LiteralNode* MAKE_str_constant(const Jrd::IntlString*, SSHORT);
 void MAKE_desc(Jrd::DsqlCompilerScratch*, dsc*, Jrd::ValueExprNode*);
 void MAKE_desc_from_field(dsc*, const Jrd::dsql_fld*);
+void MAKE_desc_from_element(dsc*, const Jrd::dsql_fld*);
 void MAKE_desc_from_list(Jrd::DsqlCompilerScratch*, dsc*, Jrd::ValueListNode*, const TEXT*);
 Jrd::FieldNode* MAKE_field(Jrd::dsql_ctx*, Jrd::dsql_fld*, Jrd::ValueListNode*);
 Jrd::FieldNode* MAKE_field_name(const char*);

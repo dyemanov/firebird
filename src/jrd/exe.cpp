@@ -1068,11 +1068,11 @@ void EXE_execute_triggers(thread_db* tdbb,
 
 	if (!is_db_trigger && (!old_rec || !new_rec))
 	{
-		const Record* const record = old_rec ? old_rec : new_rec;
-		fb_assert(record && record->getFormat());
+		record_param* rpb = old_rpb ? old_rpb : new_rpb;
+		fb_assert(rpb && rpb->rpb_relation);
 		// copy the record
 		MemoryPool& pool = *tdbb->getDefaultPool();
-		null_rec = FB_NEW_POOL(pool) Record(pool, record->getFormat());
+		null_rec = FB_NEW_POOL(pool) Record(pool, MET_current(tdbb, rpb->rpb_relation));
 		// initialize all fields to missing
 		null_rec->nullify();
 	}

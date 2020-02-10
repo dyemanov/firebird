@@ -4104,6 +4104,8 @@ namespace Firebird
 			int (CLOOP_CARG *getWait)(ITraceTransaction* self) throw();
 			unsigned (CLOOP_CARG *getIsolation)(ITraceTransaction* self) throw();
 			PerformanceInfo* (CLOOP_CARG *getPerf)(ITraceTransaction* self) throw();
+			ISC_INT64 (CLOOP_CARG *getInitialID)(ITraceTransaction* self) throw();
+			ISC_INT64 (CLOOP_CARG *getPreviousID)(ITraceTransaction* self) throw();
 		};
 
 	protected:
@@ -4117,7 +4119,7 @@ namespace Firebird
 		}
 
 	public:
-		static const unsigned VERSION = 2;
+		static const unsigned VERSION = 3;
 
 		static const unsigned ISOLATION_CONSISTENCY = 1;
 		static const unsigned ISOLATION_CONCURRENCY = 2;
@@ -4151,6 +4153,26 @@ namespace Firebird
 		PerformanceInfo* getPerf()
 		{
 			PerformanceInfo* ret = static_cast<VTable*>(this->cloopVTable)->getPerf(this);
+			return ret;
+		}
+
+		ISC_INT64 getInitialID()
+		{
+			if (cloopVTable->version < 3)
+			{
+				return 0;
+			}
+			ISC_INT64 ret = static_cast<VTable*>(this->cloopVTable)->getInitialID(this);
+			return ret;
+		}
+
+		ISC_INT64 getPreviousID()
+		{
+			if (cloopVTable->version < 3)
+			{
+				return 0;
+			}
+			ISC_INT64 ret = static_cast<VTable*>(this->cloopVTable)->getPreviousID(this);
 			return ret;
 		}
 	};
@@ -4726,6 +4748,7 @@ namespace Firebird
 		struct VTable : public IReferenceCounted::VTable
 		{
 			unsigned (CLOOP_CARG *write)(ITraceLogWriter* self, const void* buf, unsigned size) throw();
+			unsigned (CLOOP_CARG *write_s)(ITraceLogWriter* self, IStatus* status, const void* buf, unsigned size) throw();
 		};
 
 	protected:
@@ -4739,11 +4762,25 @@ namespace Firebird
 		}
 
 	public:
-		static const unsigned VERSION = 3;
+		static const unsigned VERSION = 4;
 
 		unsigned write(const void* buf, unsigned size)
 		{
 			unsigned ret = static_cast<VTable*>(this->cloopVTable)->write(this, buf, size);
+			return ret;
+		}
+
+		template <typename StatusType> unsigned write_s(StatusType* status, const void* buf, unsigned size)
+		{
+			if (cloopVTable->version < 4)
+			{
+				StatusType::setVersionError(status, "ITraceLogWriter", cloopVTable->version, 4);
+				StatusType::checkException(status);
+				return 0;
+			}
+			StatusType::clearException(status);
+			unsigned ret = static_cast<VTable*>(this->cloopVTable)->write_s(this, status, buf, size);
+			StatusType::checkException(status);
 			return ret;
 		}
 	};
@@ -13849,6 +13886,8 @@ namespace Firebird
 					this->getWait = &Name::cloopgetWaitDispatcher;
 					this->getIsolation = &Name::cloopgetIsolationDispatcher;
 					this->getPerf = &Name::cloopgetPerfDispatcher;
+					this->getInitialID = &Name::cloopgetInitialIDDispatcher;
+					this->getPreviousID = &Name::cloopgetPreviousIDDispatcher;
 				}
 			} vTable;
 
@@ -13919,6 +13958,32 @@ namespace Firebird
 				return static_cast<PerformanceInfo*>(0);
 			}
 		}
+
+		static ISC_INT64 CLOOP_CARG cloopgetInitialIDDispatcher(ITraceTransaction* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getInitialID();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<ISC_INT64>(0);
+			}
+		}
+
+		static ISC_INT64 CLOOP_CARG cloopgetPreviousIDDispatcher(ITraceTransaction* self) throw()
+		{
+			try
+			{
+				return static_cast<Name*>(self)->Name::getPreviousID();
+			}
+			catch (...)
+			{
+				StatusType::catchException(0);
+				return static_cast<ISC_INT64>(0);
+			}
+		}
 	};
 
 	template <typename Name, typename StatusType, typename Base = IVersionedImpl<Name, StatusType, Inherit<ITraceTransaction> > >
@@ -13939,6 +14004,8 @@ namespace Firebird
 		virtual int getWait() = 0;
 		virtual unsigned getIsolation() = 0;
 		virtual PerformanceInfo* getPerf() = 0;
+		virtual ISC_INT64 getInitialID() = 0;
+		virtual ISC_INT64 getPreviousID() = 0;
 	};
 
 	template <typename Name, typename StatusType, typename Base>
@@ -15206,6 +15273,7 @@ namespace Firebird
 					this->addRef = &Name::cloopaddRefDispatcher;
 					this->release = &Name::cloopreleaseDispatcher;
 					this->write = &Name::cloopwriteDispatcher;
+					this->write_s = &Name::cloopwrite_sDispatcher;
 				}
 			} vTable;
 
@@ -15221,6 +15289,21 @@ namespace Firebird
 			catch (...)
 			{
 				StatusType::catchException(0);
+				return static_cast<unsigned>(0);
+			}
+		}
+
+		static unsigned CLOOP_CARG cloopwrite_sDispatcher(ITraceLogWriter* self, IStatus* status, const void* buf, unsigned size) throw()
+		{
+			StatusType status2(status);
+
+			try
+			{
+				return static_cast<Name*>(self)->Name::write_s(&status2, buf, size);
+			}
+			catch (...)
+			{
+				StatusType::catchException(&status2);
 				return static_cast<unsigned>(0);
 			}
 		}
@@ -15265,6 +15348,7 @@ namespace Firebird
 		}
 
 		virtual unsigned write(const void* buf, unsigned size) = 0;
+		virtual unsigned write_s(StatusType* status, const void* buf, unsigned size) = 0;
 	};
 
 	template <typename Name, typename StatusType, typename Base>

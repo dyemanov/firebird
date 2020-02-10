@@ -45,6 +45,10 @@ void	ISQL_get_character_sets(SSHORT, SSHORT, bool, bool, bool, TEXT*);
 SSHORT	ISQL_get_default_char_set_id();
 void	ISQL_get_default_source(const TEXT*, TEXT*, ISC_QUAD*);
 SSHORT	ISQL_get_field_length(const TEXT*);
+SSHORT	ISQL_get_char_length(
+	SSHORT fieldLength,
+	SSHORT characterLengthNull, SSHORT characterLength,
+	SSHORT characterSetIdNull, SSHORT characterSetId);
 SLONG	ISQL_get_index_segments(TEXT*, const size_t, const TEXT*, bool);
 bool	ISQL_get_null_flag(const TEXT*, TEXT*);
 void	ISQL_get_version(bool);

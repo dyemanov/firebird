@@ -440,18 +440,18 @@ BoolExprNode* ComparativeBoolNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		case blr_between:
 		{
 			// Try to force arg1 to be same type as arg2 eg: ? = FIELD case
-			PASS1_set_parameter_type(dsqlScratch, node->arg1, procArg2, false);
+			PASS1_set_parameter_type(dsqlScratch, node->arg1, NULL, procArg2, false);
 
 			// Try to force arg2 to be same type as arg1 eg: FIELD = ? case
 			// Try even when the above call succeeded, because "arg2" may
 			// have arg-expressions that should be resolved.
-			PASS1_set_parameter_type(dsqlScratch, procArg2, node->arg1, false);
+			PASS1_set_parameter_type(dsqlScratch, procArg2, NULL, node->arg1, false);
 
 			// X BETWEEN Y AND ? case
-			if (!PASS1_set_parameter_type(dsqlScratch, node->arg3, node->arg1, false))
+			if (!PASS1_set_parameter_type(dsqlScratch, node->arg3, NULL, node->arg1, false))
 			{
 				// ? BETWEEN Y AND ? case
-				PASS1_set_parameter_type(dsqlScratch, node->arg3, procArg2, false);
+				PASS1_set_parameter_type(dsqlScratch, node->arg3, NULL, procArg2, false);
 			}
 
 			break;
@@ -462,15 +462,15 @@ BoolExprNode* ComparativeBoolNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		case blr_similar:
 		case blr_starting:
 			// Try to force arg1 to be same type as arg2 eg: ? LIKE FIELD case
-			PASS1_set_parameter_type(dsqlScratch, node->arg1, procArg2, true);
+			PASS1_set_parameter_type(dsqlScratch, node->arg1, NULL, procArg2, true);
 
 			// Try to force arg2 same type as arg 1 eg: FIELD LIKE ? case
 			// Try even when the above call succeeded, because "arg2" may
 			// have arg-expressions that should be resolved.
-			PASS1_set_parameter_type(dsqlScratch, procArg2, node->arg1, true);
+			PASS1_set_parameter_type(dsqlScratch, procArg2, NULL, node->arg1, true);
 
 			// X LIKE Y ESCAPE ? case
-			PASS1_set_parameter_type(dsqlScratch, node->arg3, procArg2, true);
+			PASS1_set_parameter_type(dsqlScratch, node->arg3, NULL, procArg2, true);
 	}
 
 	return node;
@@ -1288,7 +1288,7 @@ BoolExprNode* ComparativeBoolNode::createRseNode(DsqlCompilerScratch* dsqlScratc
 	ComparativeBoolNode* cmpNode = FB_NEW_POOL(getPool()) ComparativeBoolNode(getPool(), blrOp,
 		doDsqlPass(dsqlScratch, arg1, false), rse->dsqlSelectList->items[0]);
 
-	PASS1_set_parameter_type(dsqlScratch, cmpNode->arg1, cmpNode->arg2, false);
+	PASS1_set_parameter_type(dsqlScratch, cmpNode->arg1, NULL, cmpNode->arg2, false);
 
 	rse->dsqlWhere = cmpNode;
 
@@ -1339,7 +1339,7 @@ BoolExprNode* MissingBoolNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 	MissingBoolNode* node = FB_NEW_POOL(getPool()) MissingBoolNode(getPool(),
 		doDsqlPass(dsqlScratch, arg));
 
-	PASS1_set_parameter_type(dsqlScratch, node->arg, (dsc*) NULL, false);
+	PASS1_set_parameter_type(dsqlScratch, node->arg, NULL, NULL, false);
 
 	dsc desc;
 	MAKE_desc(dsqlScratch, &desc, node->arg);

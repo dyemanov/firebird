@@ -74,6 +74,7 @@
 #include "../common/enc_proto.h"
 #include "../common/classes/InternalMessageBuffer.h"
 #include "../common/os/os_utils.h"
+#include "../common/security.h"
 
 using namespace Firebird;
 
@@ -640,6 +641,9 @@ public:
 					&authPort->port_srv_auth_block->authBlockWriter);
 			authPort->port_srv_auth_block->setPluginName(authItr->name());
 
+			if (forceNext)
+				flags = NO_FLAGS;
+
 			cstring* s;
 
 			switch (authResult)
@@ -1009,7 +1013,7 @@ class CryptKeyTypeManager : public PermanentStorage
 
 		void value(PathName& to) const
 		{
-			REMOTE_makeList(to, plugins);
+			plugins.makeList(to);
 		}
 
 	private:
@@ -1029,8 +1033,8 @@ public:
 			check(&st);
 
 			fb_assert(list);
-			Remote::ParsedList newTypes;
-			REMOTE_parseList(newTypes, PathName(list));
+			PathName tmp(list);
+			Remote::ParsedList newTypes(tmp);
 
 			PathName plugin(cpItr.name());
 			for (unsigned i = 0; i < newTypes.getCount(); ++i)
@@ -1880,6 +1884,7 @@ static bool accept_connection(rem_port* port, P_CNCT* connect, PACKET* send)
 	if (type == ptype_lazy_send)
 		port->port_flags |= PORT_lazy;
 
+	port->port_client_arch = connect->p_cnct_client;
 
 	Firebird::ClumpletReader id(Firebird::ClumpletReader::UnTagged,
 								connect->p_cnct_user_id.cstr_address,
@@ -1991,6 +1996,7 @@ static bool accept_connection(rem_port* port, P_CNCT* connect, PACKET* send)
 						}
 						port->port_srv_auth_block->setPluginName(plugins->name());
 						port->port_srv_auth_block->extractPluginName(&send->p_acpd.p_acpt_plugin);
+						returnData = true;
 						break;
 
 					case IAuth::AUTH_MORE_DATA:
@@ -5708,7 +5714,7 @@ void rem_port::start_crypt(P_CRYPT * crypt, PACKET* sendL)
 		PathName keyName(crypt->p_key.cstr_address, crypt->p_key.cstr_length);
 		for (unsigned k = 0; k < port_crypt_keys.getCount(); ++k)
 		{
-			if (keyName == port_crypt_keys[k]->t)
+			if (keyName == port_crypt_keys[k]->keyName)
 			{
 				key = port_crypt_keys[k];
 				break;
@@ -5722,9 +5728,7 @@ void rem_port::start_crypt(P_CRYPT * crypt, PACKET* sendL)
 
 		PathName plugName(crypt->p_plugin.cstr_address, crypt->p_plugin.cstr_length);
 		// Check it's availability
-		Remote::ParsedList plugins;
-
-		REMOTE_parseList(plugins, Config::getDefaultConfig()->getPlugins(
+		Remote::ParsedList plugins(Config::getDefaultConfig()->getPlugins(
 			IPluginManager::TYPE_WIRE_CRYPT));
 
 		bool found = false;
@@ -5760,7 +5764,7 @@ void rem_port::start_crypt(P_CRYPT * crypt, PACKET* sendL)
 		port_crypt_complete = true;
 
 		send_response(sendL, 0, 0, &st, false);
-		WIRECRYPT_DEBUG(fprintf(stderr, "Installed cipher %s\n", cp.name()));
+		WIRECRYPT_DEBUG(fprintf(stderr, "Srv: Installed cipher %s\n", cp.name()));
 	}
 	catch (const Exception& ex)
 	{
@@ -6639,13 +6643,10 @@ void SrvAuthBlock::createPluginsItr()
 		return;
 	}
 
-	Remote::ParsedList fromClient;
-	REMOTE_parseList(fromClient, pluginList);
-
-	Remote::ParsedList onServer;
-	REMOTE_parseList(onServer, port->getPortConfig()->getPlugins(IPluginManager::TYPE_AUTH_SERVER));
-
+	Remote::ParsedList fromClient(pluginList);
+	Remote::ParsedList onServer(port->getPortConfig()->getPlugins(IPluginManager::TYPE_AUTH_SERVER));
 	Remote::ParsedList final;
+
 	for (unsigned s = 0; s < onServer.getCount(); ++s)
 	{
 		// do not expect too long lists, therefore use double loop
@@ -6697,7 +6698,7 @@ void SrvAuthBlock::createPluginsItr()
 		final.push(onServer[onServer.getCount() - 1]);
 	}
 
-	REMOTE_makeList(pluginList, final);
+	final.makeList(pluginList);
 
 	RefPtr<const Config> portConf(port->getPortConfig());
 	plugins = FB_NEW AuthServerPlugins(IPluginManager::TYPE_AUTH_SERVER, portConf, pluginList.c_str());
@@ -6725,18 +6726,18 @@ bool SrvAuthBlock::extractNewKeys(CSTRING* to, ULONG flags)
 	{
 		for (unsigned n = 0; n < newKeys.getCount(); ++n)
 		{
-			const PathName& t = newKeys[n]->t;
+			const PathName& t = newKeys[n]->keyName;
 			PathName plugins = knownCryptKeyTypes()[t];
 			if (plugins.hasData())
 			{
-				lastExtractedKeys.insertPath(TAG_KEY_TYPE, t);
-				lastExtractedKeys.insertPath(TAG_KEY_PLUGINS, plugins);
+				lastExtractedKeys.insertString(TAG_KEY_TYPE, t);
+				lastExtractedKeys.insertString(TAG_KEY_PLUGINS, plugins);
 			}
 		}
 
 		if ((flags & EXTRACT_PLUGINS_LIST) && (dataFromPlugin.getCount() == 0))
 		{
-			lastExtractedKeys.insertPath(TAG_KNOWN_PLUGINS, pluginList);
+			lastExtractedKeys.insertString(TAG_KNOWN_PLUGINS, pluginList);
 		}
 	}
 

@@ -54,7 +54,7 @@ public:
 	virtual ~TraceSvcUtil();
 
 	virtual void setAttachInfo(const string& service_name, const string& user, const string& pwd,
-		const AuthReader::AuthBlock& authBlock, bool isAdmin);
+		bool trusted);
 
 	virtual void startSession(TraceSession& session, bool interactive);
 	virtual void stopSession(ULONG id);
@@ -85,7 +85,7 @@ TraceSvcUtil::~TraceSvcUtil()
 }
 
 void TraceSvcUtil::setAttachInfo(const string& service_name, const string& user, const string& pwd,
-		const AuthReader::AuthBlock& /*authBlock*/, bool isAdmin)
+		bool trusted)
 {
 	ISC_STATUS_ARRAY status = {0};
 
@@ -97,7 +97,7 @@ void TraceSvcUtil::setAttachInfo(const string& service_name, const string& user,
 	if (pwd.hasData()) {
 		spb.insertString(isc_spb_password, pwd);
 	}
-	if (isAdmin) {
+	if (trusted) {
 		spb.insertTag(isc_spb_trusted_auth);
 	}
 
@@ -292,11 +292,6 @@ void TraceSvcUtil::runService(size_t spbSize, const UCHAR* spb)
 
 using namespace Firebird;
 
-static void atexit_fb_shutdown()
-{
-	fb_shutdown(0, fb_shutrsn_app_stopped);
-}
-
 
 int CLIB_ROUTINE main(int argc, char* argv[])
 {
@@ -320,7 +315,7 @@ int CLIB_ROUTINE main(int argc, char* argv[])
 	_setmode(binout, _O_BINARY);
 #endif
 
-	atexit(&atexit_fb_shutdown);
+	fb_utils::FbShutdown appShutdown(fb_shutrsn_app_stopped);
 
 	AutoPtr<UtilSvc> uSvc(UtilSvc::createStandalone(argc, argv));
 	try

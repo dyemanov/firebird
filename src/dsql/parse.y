@@ -89,7 +89,6 @@
 #include "../jrd/DataTypeUtil.h"
 #include "../dsql/errd_proto.h"
 #include "../dsql/make_proto.h"
-#include "../yvalve/keywords.h"
 #include "../yvalve/gds_proto.h"
 #include "../jrd/err_proto.h"
 #include "../common/intlobj_new.h"
@@ -2830,9 +2829,9 @@ proc_statements
 
 %type <stmtNode> proc_statement
 proc_statement
-	: simple_proc_statement ';'
+	: simple_proc_statement ';' [YYVALID;]
 		{ $$ = newNode<LineColumnNode>(YYPOSNARG(1).firstLine, YYPOSNARG(1).firstColumn, $1); }
-	| complex_proc_statement
+	| complex_proc_statement [YYVALID;]
 		{ $$ = newNode<LineColumnNode>(YYPOSNARG(1).firstLine, YYPOSNARG(1).firstColumn, $1); }
 	;
 
@@ -5978,13 +5977,13 @@ boolean_value_expression
 		{ $$ = $2; }
 	| value IS boolean_literal
 		{
-			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_eql, $1, $3);
+			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_equiv, $1, $3);
 			node->dsqlCheckBoolean = true;
 			$$ = node;
 		}
 	| value IS NOT boolean_literal
 		{
-			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_eql, $1, $4);
+			ComparativeBoolNode* node = newNode<ComparativeBoolNode>(blr_equiv, $1, $4);
 			node->dsqlCheckBoolean = true;
 			$$ = newNode<NotBoolNode>(node);
 		}

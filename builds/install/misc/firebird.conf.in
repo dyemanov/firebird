@@ -559,6 +559,27 @@
 
 
 # ----------------------------
+# How COMMIT\ROLLBACK RETAINING handle GLOBAL TEMPORARY TABLE ON COMMIT DELETE ROWS 
+#
+# GLOBAL TEMPORARY TABLE ON COMMIT DELETE ROWS (GTT) data is cleared on "hard"
+# commit (rollback) but should be preserved on commit(rollback) retaining. 
+# Due to bug in initial implementation in Firebird 2.1 that data is not visible
+# for the application. This setting allows to preserve backward compatibility 
+# (i.e. clear GTT data on commit\rollback retaining).
+# Value of 0 makes engine to not clear GTT data on commit\rollback retaining and
+# let application to see it.
+# Default value is 1 (clear GTT data on commit\rollback retaining).
+# Note: in Firebird 4 default value will be changed to 0 and this setting will
+# be removed at Firebird 5.
+#
+# Per-database configurable.
+#
+# Type: boolean
+#
+#ClearGTTAtRetaining = 1
+
+
+# ----------------------------
 # Relaxing relation alias checking rules in SQL
 #
 # Since Firebird 2.0, strict alias checking rules were implemented in the SQL
@@ -694,6 +715,14 @@
 # Type: boolean
 #
 #TcpNoNagle = 1
+
+#
+# Either enables or disables the "TCP Loopback Fast Path" feature (SIO_LOOPBACK_FAST_PATH).
+# Applies to Windows (version 8/2012 or higher) only.
+#
+# Type: Boolean, default 1 (true)
+#
+#TcpLoopbackFastPath = 1
 
 #
 # Allows setting of IPV6_V6ONLY socket option. If enabled, IPv6 sockets

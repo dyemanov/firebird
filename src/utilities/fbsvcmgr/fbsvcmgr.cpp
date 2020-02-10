@@ -563,10 +563,16 @@ const SvcSwitches actionSwitch[] =
 
 // print information, returned by isc_svc_query() call
 
+USHORT getShort(const char*& p)
+{
+	const USHORT num = (USHORT) isc_vax_integer(p, sizeof(USHORT));
+	p += sizeof(USHORT);
+	return num;
+}
+
 bool getLine(string& dest, const char*& p)
 {
-	const USHORT length = (USHORT) isc_vax_integer(p, sizeof(USHORT));
-	p += sizeof(USHORT);
+	const USHORT length = getShort(p);
 	dest.assign(p, length);
 	p += length;
 	return length > 0;
@@ -740,6 +746,8 @@ bool printInfo(const char* p, size_t pSize, UserPrint& up, ULONG& stdinRq)
 	bool ignoreTruncation = false;
 	stdinRq = 0;
 	const char* const end = p + pSize;
+	USHORT l;
+	const char* limboEnd;
 
 	while (p < end && *p != isc_info_end)
 	{
@@ -791,7 +799,12 @@ bool printInfo(const char* p, size_t pSize, UserPrint& up, ULONG& stdinRq)
 			break;
 
 		case isc_info_svc_limbo_trans:
-			while (*p != isc_info_flag_end)
+			l = getShort(p);
+			limboEnd = &p[l];
+			if (limboEnd > end)
+				limboEnd = end;
+
+			while (*p != isc_info_flag_end && p < limboEnd)
 			{
 				switch (*p++)
 				{
@@ -814,7 +827,7 @@ bool printInfo(const char* p, size_t pSize, UserPrint& up, ULONG& stdinRq)
 			            printMessage(41);
 						break;
 					default:
-						status_exception::raise(Arg::Gds(isc_fbsvcmgr_info_err) <<
+						status_exception::raise(Arg::Gds(isc_fbsvcmgr_limbo_state) <<
 												Arg::Num(static_cast<unsigned char>(p[-1])));
 					}
 					break;
@@ -837,7 +850,7 @@ bool printInfo(const char* p, size_t pSize, UserPrint& up, ULONG& stdinRq)
 			            printMessage(46);
 						break;
 					default:
-						status_exception::raise(Arg::Gds(isc_fbsvcmgr_info_err) <<
+						status_exception::raise(Arg::Gds(isc_fbsvcmgr_info_limbo) <<
 												Arg::Num(static_cast<unsigned char>(p[-1])));
 					}
 					break;
@@ -860,11 +873,12 @@ bool printInfo(const char* p, size_t pSize, UserPrint& up, ULONG& stdinRq)
 					printInt64(p, 37);
 					break;
 				default:
-					status_exception::raise(Arg::Gds(isc_fbsvcmgr_info_err) <<
+					status_exception::raise(Arg::Gds(isc_fbsvcmgr_info_limbo) <<
 											Arg::Num(static_cast<unsigned char>(p[-1])));
 				}
 			}
-			p++;
+			if (*p == isc_info_flag_end)
+				p++;
 			break;
 
 		case isc_info_svc_get_users:
@@ -1018,9 +1032,9 @@ void testSvc(isc_svc_handle* h, ClumpletWriter& spb, const SvcSwitches* sw)
 						static_cast<USHORT>(spb.getBufferLength()),
 						reinterpret_cast<const char*>(spb.getBuffer())))
 					{
-						isc_print_status(status);
-						isc_service_detach(status, h);
-						exit(1);
+						ISC_STATUS_ARRAY local;
+						isc_service_detach(local, h);
+						Firebird::status_exception::raise(status);
 					}
 					spb.clear();
 				}
@@ -1037,10 +1051,7 @@ void testServices()
 {
 	FILE* f = fopen(fileTest, "w");
 	if (!f)
-	{
-		perror(fileTest);
-		exit(1);
-	}
+		Firebird::system_call_failed::raise(fileTest);
 	fputs(fileTest, f);
 	fclose(f);
 
@@ -1055,8 +1066,7 @@ void testServices()
 				static_cast<USHORT>(spbAtt.getBufferLength()),
 				reinterpret_cast<const char*>(spbAtt.getBuffer())))
 	{
-		isc_print_status(status);
-		exit(1);
+		Firebird::status_exception::raise(status);
 	}
 
 	ClumpletWriter spbStart(ClumpletWriter::SpbStart,  1024 * 1024);
@@ -1094,12 +1104,6 @@ void usage(bool listSwitches)
 }
 
 
-static void atexit_fb_shutdown()
-{
-	fb_shutdown(0, fb_shutrsn_app_stopped);
-}
-
-
 // simple main function
 
 int main(int ac, char** av)
@@ -1115,26 +1119,26 @@ int main(int ac, char** av)
 		return 1;
 	}
 
+	try {
 #ifdef DEV_BUILD
-	if (ac == 2 && strcmp(av[1], "-@") == 0)
-	{
-		testServices();
-		return 0;
-	}
+		if (ac == 2 && strcmp(av[1], "-@") == 0)
+		{
+			testServices();
+			return 0;
+		}
 #endif
 
-	if (ac == 2 && (strcmp(av[1], "-z") == 0 || strcmp(av[1], "-Z") == 0))
-	{
-		printMessage(51, SafeArg() << FB_VERSION);
-		return 0;
-	}
+		if (ac == 2 && (strcmp(av[1], "-z") == 0 || strcmp(av[1], "-Z") == 0))
+		{
+			printMessage(51, SafeArg() << FB_VERSION);
+			return 0;
+		}
 
-	os_utils::CtrlCHandler ctrlCHandler;
-	atexit(&atexit_fb_shutdown);
+		os_utils::CtrlCHandler ctrlCHandler;
+		fb_utils::FbShutdown appShutdown(fb_shutrsn_app_stopped);
 
-	ISC_STATUS_ARRAY status;
+		ISC_STATUS_ARRAY status;
 
-	try {
 		const int maxbuf = 16384;
 		av++;
 

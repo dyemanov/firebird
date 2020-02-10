@@ -4713,6 +4713,8 @@ YTransaction::YTransaction(YAttachment* aAttachment, ITransaction* aNext)
 
 FB_API_HANDLE& YTransaction::getHandle()
 {
+	// Not assigning handle in ctor is essential for correct operation
+	// of YTransaction::destroy - change it when changing handle behavior.
 	if (!handle)
 		makeHandle(&transactions, this, handle);
 	return handle;
@@ -4729,8 +4731,12 @@ void YTransaction::destroy(unsigned dstrFlags)
 
 	cleanupHandlers.clear();
 
+	// If handle is not null then application works with ISC API and
+	// can't release cursors by itself. See also CORE-6067.
+	const bool releaseCursors = handle;
+
 	childBlobs.destroy(dstrFlags & ~DF_RELEASE);
-	childCursors.destroy(dstrFlags & ~DF_RELEASE);
+	childCursors.destroy(releaseCursors ? dstrFlags : dstrFlags & ~DF_RELEASE);
 
 	YAttachment* att = attachment.release();
 	if (att)
@@ -5699,7 +5705,7 @@ YAttachment* Dispatcher::attachOrCreateDatabase(Firebird::CheckStatusWrapper* st
 
 		// Add original filename to DPB
 		if (orgFilename != expandedFilename && !newDpb.find(isc_dpb_org_filename))
-			newDpb.insertPath(isc_dpb_org_filename, orgFilename);
+			newDpb.insertString(isc_dpb_org_filename, orgFilename);
 
 		StatusVector temp(NULL);
 		CheckStatusWrapper tempCheckStatusWrapper(&temp);

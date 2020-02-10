@@ -389,6 +389,10 @@ void defineComputed(DsqlCompilerScratch* dsqlScratch, RelationSourceNode* relati
 		{
 			field->charSetId = DSC_GET_CHARSET(&desc);
 			field->collationId = DSC_GET_COLLATE(&desc);
+
+			const USHORT adjust = field->dtype == dtype_varying ? sizeof(USHORT) : 0;
+			const USHORT bpc = METD_get_charset_bpc(dsqlScratch->getTransaction(), field->charSetId.value);
+			field->charLength = (field->length - adjust) / bpc;
 		}
 		else
 			field->subType = desc.dsc_sub_type;
@@ -1607,9 +1611,12 @@ bool CreateAlterFunctionNode::checkPermission(thread_db* tdbb, jrd_tra* transact
 	dsc dscName;
 	dscName.makeText(name.length(), CS_METADATA, (UCHAR*) name.c_str());
 	if (alter)
-		SCL_check_function(tdbb, &dscName, SCL_alter);
-	else
-		SCL_check_create_access(tdbb, SCL_object_function);
+	{
+		if (SCL_check_function(tdbb, &dscName, SCL_alter) || !create)
+			return true;
+	}
+
+	SCL_check_create_access(tdbb, SCL_object_function);
 	return true;
 }
 
@@ -2602,9 +2609,12 @@ bool CreateAlterProcedureNode::checkPermission(thread_db* tdbb, jrd_tra* transac
 	dsc dscName;
 	dscName.makeText(name.length(), CS_METADATA, (UCHAR*) name.c_str());
 	if (alter)
-		SCL_check_procedure(tdbb, &dscName, SCL_alter);
-	else
-		SCL_check_create_access(tdbb, SCL_object_procedure);
+	{
+		if (SCL_check_procedure(tdbb, &dscName, SCL_alter) || !create)
+			return true;
+	}
+
+	SCL_check_create_access(tdbb, SCL_object_procedure);
 	return true;
 }
 
@@ -5220,9 +5230,12 @@ string CreateAlterExceptionNode::internalPrint(NodePrinter& printer) const
 bool CreateAlterExceptionNode::checkPermission(thread_db* tdbb, jrd_tra* transaction)
 {
 	if (alter)
-		SCL_check_exception(tdbb, name, SCL_alter);
-	else
-		SCL_check_create_access(tdbb, SCL_object_exception);
+	{
+		if (SCL_check_exception(tdbb, name, SCL_alter) || !create)
+			return true;
+	}
+
+	SCL_check_create_access(tdbb, SCL_object_exception);
 	return true;
 }
 
@@ -5436,9 +5449,12 @@ string CreateAlterSequenceNode::internalPrint(NodePrinter& printer) const
 bool CreateAlterSequenceNode::checkPermission(thread_db* tdbb, jrd_tra* transaction)
 {
 	if (alter)
-		SCL_check_generator(tdbb, name, SCL_alter);
-	else
-		SCL_check_create_access(tdbb, SCL_object_generator);
+	{
+		if (SCL_check_generator(tdbb, name, SCL_alter) || !create)
+			return true;
+	}
+
+	SCL_check_create_access(tdbb, SCL_object_generator);
 	return true;
 }
 
@@ -8290,9 +8306,12 @@ bool CreateAlterViewNode::checkPermission(thread_db* tdbb, jrd_tra* transaction)
 	dsc dscName;
 	dscName.makeText(name.length(), CS_METADATA, (UCHAR*) name.c_str());
 	if (alter)
-		SCL_check_view(tdbb, &dscName, SCL_alter);
-	else
-		SCL_check_create_access(tdbb, SCL_object_view);
+	{
+		if (SCL_check_view(tdbb, &dscName, SCL_alter) || !create)
+			return true;
+	}
+
+	SCL_check_create_access(tdbb, SCL_object_view);
 	return true;
 }
 
@@ -11030,7 +11049,7 @@ static bool checkObjectExist(thread_db* tdbb, jrd_tra* transaction, const MetaNa
 				X IN RDB$RELATIONS
 				WITH X.RDB$RELATION_NAME EQ name.c_str()
 			{
-				rc =  (type != obj_view) || (X.RDB$RELATION_TYPE == rel_view);
+				rc = (type != obj_view) || !X.RDB$VIEW_BLR.NULL;
 			}
 			END_FOR
 			break;
@@ -11394,8 +11413,11 @@ void GrantRevokeNode::grantRevoke(thread_db* tdbb, jrd_tra* transaction, const G
 						break;
 					}
 
+					case obj_procedure:
+					case obj_udf:
 					case obj_exception:
 					case obj_generator:
+					case obj_package_header:
 					{
 						checkGrantorCanGrantObject(tdbb, transaction,
 							tdbb->getAttachment()->att_user->usr_user_name.c_str(), priv, objName, objType);
@@ -11519,6 +11541,8 @@ void GrantRevokeNode::checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* tra
 	const char* grantor, const char* privilege, const MetaName& relationName,
 	const MetaName& fieldName, bool topLevel)
 {
+	const Attachment* attachment = tdbb->getAttachment();
+
 	// Verify that the input relation exists.
 
 	AutoCacheRequest request(tdbb, drq_gcg4, DYN_REQUESTS);
@@ -11569,7 +11593,7 @@ void GrantRevokeNode::checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* tra
 
 	// If the current user is locksmith - allow all grants to occur
 
-	if (tdbb->getAttachment()->locksmith())
+	if (attachment->locksmith())
 		return;
 
 	// If this is a non-sql table, then the owner will probably not have any
@@ -11604,34 +11628,36 @@ void GrantRevokeNode::checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* tra
 
 	request.reset(tdbb, drq_gcg1, DYN_REQUESTS);
 
+	const char* roleName = attachment->att_user->usr_sql_role_name.c_str();
+
 	FOR(REQUEST_HANDLE request TRANSACTION_HANDLE transaction)
-		PRV IN RDB$USER_PRIVILEGES WITH
-			PRV.RDB$USER = UPPERCASE(grantor) AND
-			PRV.RDB$USER_TYPE = obj_user AND
+		PRV IN RDB$USER_PRIVILEGES
+		WITH ((PRV.RDB$USER = UPPERCASE(grantor) AND PRV.RDB$USER_TYPE = obj_user) OR
+			(PRV.RDB$USER = UPPERCASE(roleName) AND (PRV.RDB$USER_TYPE = obj_sql_role))) AND
 			PRV.RDB$RELATION_NAME = relationName.c_str() AND
 			PRV.RDB$OBJECT_TYPE = obj_relation AND
 			PRV.RDB$PRIVILEGE = privilege
 	{
+		const bool hasGrantOption = !PRV.RDB$GRANT_OPTION.NULL && PRV.RDB$GRANT_OPTION;
 		if (PRV.RDB$FIELD_NAME.NULL)
 		{
-			if (PRV.RDB$GRANT_OPTION.NULL || !PRV.RDB$GRANT_OPTION)
-				goRel = 0;
-			else if (goRel)
+			if (goRel == -1)
+				goRel = hasGrantOption ? 1 : 0;
+			else if ((goRel == 0) && hasGrantOption)
 				goRel = 1;
 		}
 		else
 		{
-			if (PRV.RDB$GRANT_OPTION.NULL || !PRV.RDB$GRANT_OPTION)
+			if (fieldName.hasData() && fieldName == PRV.RDB$FIELD_NAME)
 			{
-				if (fieldName.hasData() && fieldName == PRV.RDB$FIELD_NAME)
-					goFld = 0;
-			}
-			else
-			{
-				if (fieldName.hasData() && fieldName == PRV.RDB$FIELD_NAME)
+				if (goFld == -1)
+					goFld = hasGrantOption ? 1 : 0;
+				else if ((goFld == 0) && hasGrantOption)
 					goFld = 1;
 			}
 		}
+		if ( (goRel > 0) && (goFld > 0 || !fieldName.hasData()) )
+			break;	// We've found a privilege with grant option and can break the loop
 	}
 	END_FOR
 
@@ -11641,7 +11667,7 @@ void GrantRevokeNode::checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* tra
 		{
 			// no grant option for privilege .. on column .. of [base] table/view ..
 			status_exception::raise(Arg::PrivateDyn(topLevel ? 167 : 168) <<
-				privilege << fieldName.c_str() << relationName.c_str());
+				privilegeName(*privilege) << fieldName.c_str() << relationName.c_str());
 		}
 
 		if (goFld == -1)
@@ -11650,14 +11676,14 @@ void GrantRevokeNode::checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* tra
 			{
 				// no grant option for privilege .. on [base] table/view .. (for column ..)
 				status_exception::raise(Arg::PrivateDyn(topLevel ? 169 : 170) <<
-					privilege << relationName.c_str() << fieldName.c_str());
+					privilegeName(*privilege) << relationName.c_str() << fieldName.c_str());
 			}
 
 			if (goRel == -1)
 			{
 				// no .. privilege with grant option on [base] table/view .. (for column ..)
 				status_exception::raise(Arg::PrivateDyn(topLevel ? 171 : 172) <<
-					privilege << relationName.c_str() << fieldName.c_str());
+					privilegeName(*privilege) << relationName.c_str() << fieldName.c_str());
 			}
 		}
 	}
@@ -11666,13 +11692,13 @@ void GrantRevokeNode::checkGrantorCanGrantRelation(thread_db* tdbb, jrd_tra* tra
 		if (goRel == 0)
 		{
 			// no grant option for privilege .. on table/view ..
-			status_exception::raise(Arg::PrivateDyn(173) << privilege << relationName.c_str());
+			status_exception::raise(Arg::PrivateDyn(173) << privilegeName(*privilege) << relationName.c_str());
 		}
 
 		if (goRel == -1)
 		{
 			// no .. privilege with grant option on table/view ..
-			status_exception::raise(Arg::PrivateDyn(174) << privilege << relationName.c_str());
+			status_exception::raise(Arg::PrivateDyn(174) << privilegeName(*privilege) << relationName.c_str());
 		}
 	}
 
@@ -11763,29 +11789,35 @@ void GrantRevokeNode::checkGrantorCanGrantRole(thread_db* tdbb, jrd_tra* transac
 void GrantRevokeNode::checkGrantorCanGrantDdl(thread_db* tdbb, jrd_tra* transaction,
 	const MetaName& grantor, const char* privilege, const MetaName& objName)
 {
-	if (tdbb->getAttachment()->locksmith())
+	Attachment* attachment = tdbb->getAttachment();
+	if (attachment->locksmith())
 		return;
 
 	AutoCacheRequest request(tdbb, drq_l_grant_option, DYN_REQUESTS);
 	bool grantable = false;
 
+	const char* roleName = attachment->att_user->usr_sql_role_name.c_str();
+
 	FOR (REQUEST_HANDLE request TRANSACTION_HANDLE transaction)
 		PRV IN RDB$USER_PRIVILEGES
-		WITH PRV.RDB$USER = UPPERCASE(grantor.c_str()) AND
-			 PRV.RDB$USER_TYPE = obj_user AND
+		WITH ((PRV.RDB$USER = UPPERCASE(grantor.c_str()) AND PRV.RDB$USER_TYPE = obj_user) OR
+			  (PRV.RDB$USER = UPPERCASE(roleName) AND (PRV.RDB$USER_TYPE = obj_sql_role))) AND
 			 PRV.RDB$RELATION_NAME EQ objName.c_str() AND
 			 PRV.RDB$OBJECT_TYPE >= obj_database AND
 			 PRV.RDB$PRIVILEGE EQ privilege
 	{
 		if (PRV.RDB$GRANT_OPTION == 1)
+		{
 			grantable = true;
+			break;	// We've found a privilege with grant option and can break the loop
+		}
 	}
 	END_FOR
 
 	if (!grantable)
 	{
 		// no @1 privilege with grant option on DDL @2
-		status_exception::raise(Arg::PrivateDyn(299) << privilege << objName.c_str());
+		status_exception::raise(Arg::PrivateDyn(299) << privilegeName(*privilege) << objName.c_str());
 	}
 }
 
@@ -11794,28 +11826,35 @@ void GrantRevokeNode::checkGrantorCanGrantDdl(thread_db* tdbb, jrd_tra* transact
 void GrantRevokeNode::checkGrantorCanGrantObject(thread_db* tdbb, jrd_tra* transaction, const char* grantor,
 		const char* privilege, const Firebird::MetaName& objName, SSHORT objType)
 {
-	if (tdbb->getAttachment()->locksmith())
+	Attachment* attachment = tdbb->getAttachment();
+	if (attachment->locksmith())
 		return;
 
 	AutoCacheRequest request(tdbb, drq_l_grant_object, DYN_REQUESTS);
 	bool grantable = false;
 
+	const char* roleName = attachment->att_user->usr_sql_role_name.c_str();
+
 	FOR (REQUEST_HANDLE request TRANSACTION_HANDLE transaction)
 		PRV IN RDB$USER_PRIVILEGES
-		WITH (PRV.RDB$USER = UPPERCASE(grantor) AND PRV.RDB$USER_TYPE = obj_user) AND
+			WITH ((PRV.RDB$USER = UPPERCASE(grantor) AND PRV.RDB$USER_TYPE = obj_user) OR
+				  (PRV.RDB$USER = UPPERCASE(roleName) AND (PRV.RDB$USER_TYPE = obj_sql_role))) AND
 			 PRV.RDB$RELATION_NAME EQ objName.c_str() AND
-			 PRV.RDB$OBJECT_TYPE >= obj_database AND
+			 PRV.RDB$OBJECT_TYPE = objType AND
 			 PRV.RDB$PRIVILEGE EQ privilege
 	{
 		if (PRV.RDB$GRANT_OPTION == 1)
+		{
 			grantable = true;
+			break;	// We've found a privilege with grant option and can break the loop
+		}
 	}
 	END_FOR
 
 	if (!grantable)
 	{
 		// no @1 privilege with grant option on object @2
-		status_exception::raise(Arg::PrivateDyn(300) << privilege << objName.c_str());
+		status_exception::raise(Arg::PrivateDyn(300) << privilegeName(*privilege) << objName.c_str());
 	}
 }
 
@@ -11957,9 +11996,14 @@ void AlterDatabaseNode::execute(thread_db* tdbb, DsqlCompilerScratch* dsqlScratc
 
 			// msg 297: Concurrent ALTER DATABASE is not supported
 			Arg::PrivateDyn status(297);
+			string trans_num_str;
 
 			if (conflict_trans)
-				status << Arg::Gds(isc_concurrent_transaction) << Arg::Num(conflict_trans);
+			{
+				// Cannot use Arg::Num here because transaction number is 64-bit signed integer
+				trans_num_str.printf("%" SQUADFORMAT, conflict_trans);
+				status << Arg::Gds(isc_concurrent_transaction) << Arg::Str(trans_num_str);
+			}
 
 			status_exception::raise(status);
 		}

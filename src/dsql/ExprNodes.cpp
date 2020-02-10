@@ -449,10 +449,10 @@ void ArithmeticNode::setParameterName(dsql_par* parameter) const
 }
 
 bool ArithmeticNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg1, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, arg2, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg1, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, arg2, desc, node, forceVarChar);
 }
 
 void ArithmeticNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -2678,7 +2678,7 @@ ValueExprNode* CastNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 	node->dsqlField = dsqlField;
 
 	DDL_resolve_intl_type(dsqlScratch, node->dsqlField, NULL);
-	node->setParameterType(dsqlScratch, NULL, false);
+	node->setParameterType(dsqlScratch, NULL, NULL, false);
 
 	MAKE_desc_from_field(&node->castDesc, node->dsqlField);
 	MAKE_desc(dsqlScratch, &node->source->nodDesc, node->source);
@@ -2694,7 +2694,7 @@ void CastNode::setParameterName(dsql_par* parameter) const
 }
 
 bool CastNode::setParameterType(DsqlCompilerScratch* /*dsqlScratch*/,
-	const dsc* /*desc*/, bool /*forceVarChar*/)
+	const dsc* /*desc*/, ValueExprNode* /*node*/, bool /*forceVarChar*/)
 {
 	// ASF: Attention: CastNode::dsqlPass calls us with NULL node.
 
@@ -2922,7 +2922,14 @@ ValueExprNode* CoalesceNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 	CoalesceNode* node = FB_NEW_POOL(getPool()) CoalesceNode(getPool(),
 		doDsqlPass(dsqlScratch, args));
 	node->make(dsqlScratch, &node->nodDesc);	// Set descriptor for output node.
-	node->setParameterType(dsqlScratch, &node->nodDesc, false);
+
+	for (NestConst<ValueExprNode>* item = node->args->items.begin();
+		 item != node->args->items.end();
+		 ++item)
+	{
+		PASS1_set_parameter_type(dsqlScratch, *item, &node->nodDesc, NULL, false);
+	}
+
 	return node;
 }
 
@@ -2932,14 +2939,9 @@ void CoalesceNode::setParameterName(dsql_par* parameter) const
 }
 
 bool CoalesceNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool /*forceVarChar*/)
+	const dsc* desc, ValueExprNode* node, bool /*forceVarChar*/)
 {
-	bool ret = false;
-
-	for (NestConst<ValueExprNode>* ptr = args->items.begin(); ptr != args->items.end(); ++ptr)
-		ret |= PASS1_set_parameter_type(dsqlScratch, *ptr, desc, false);
-
-	return ret;
+	return false;
 }
 
 void CoalesceNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -3138,10 +3140,10 @@ void ConcatenateNode::setParameterName(dsql_par* parameter) const
 }
 
 bool ConcatenateNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg1, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, arg2, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg1, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, arg2, desc, node, forceVarChar);
 }
 
 void ConcatenateNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -3915,7 +3917,7 @@ ValueExprNode* DecodeNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		doDsqlPass(dsqlScratch, conditions), doDsqlPass(dsqlScratch, values));
 	node->label = label;
 	node->make(dsqlScratch, &node->nodDesc);	// Set descriptor for output node.
-	node->setParameterType(dsqlScratch, &node->nodDesc, false);
+	node->setParameterType(dsqlScratch, &node->nodDesc, NULL, false);
 
 	// Workaround for DECODE/CASE supporting only 255 items - see CORE-5366.
 
@@ -3978,7 +3980,7 @@ void DecodeNode::setParameterName(dsql_par* parameter) const
 }
 
 bool DecodeNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool /*forceVarChar*/)
+	const dsc* desc, ValueExprNode* node, bool /*forceVarChar*/)
 {
 	// Check if there is a parameter in the test/conditions.
 	bool setParameters = test->is<ParameterNode>();
@@ -4022,13 +4024,13 @@ bool DecodeNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
 		if (!node1Desc.isUnknown())
 		{
 			// Set parameter describe information.
-			PASS1_set_parameter_type(dsqlScratch, test, &node1Desc, false);
+			PASS1_set_parameter_type(dsqlScratch, test, &node1Desc, NULL, false);
 
 			for (NestConst<ValueExprNode>* ptr = conditions->items.begin();
 				 ptr != conditions->items.end();
 				 ++ptr)
 			{
-				PASS1_set_parameter_type(dsqlScratch, *ptr, &node1Desc, false);
+				PASS1_set_parameter_type(dsqlScratch, *ptr, &node1Desc, NULL, false);
 			}
 		}
 	}
@@ -4036,7 +4038,9 @@ bool DecodeNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
 	bool ret = false;
 
 	for (NestConst<ValueExprNode>* ptr = values->items.begin(); ptr != values->items.end(); ++ptr)
-		ret |= PASS1_set_parameter_type(dsqlScratch, *ptr, desc, false);
+	{
+		ret |= PASS1_set_parameter_type(dsqlScratch, *ptr, desc, node, false);
+	}
 
 	return ret;
 }
@@ -4479,9 +4483,9 @@ void ExtractNode::setParameterName(dsql_par* parameter) const
 }
 
 bool ExtractNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg, desc, node, forceVarChar);
 }
 
 void ExtractNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -5998,9 +6002,9 @@ void GenIdNode::setParameterName(dsql_par* parameter) const
 }
 
 bool GenIdNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg, desc, node, forceVarChar);
 }
 
 void GenIdNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -6749,12 +6753,6 @@ void LiteralNode::setParameterName(dsql_par* parameter) const
 	parameter->par_name = parameter->par_alias = "CONSTANT";
 }
 
-bool LiteralNode::setParameterType(DsqlCompilerScratch* /*dsqlScratch*/,
-	const dsc* /*desc*/, bool /*forceVarChar*/)
-{
-	return false;
-}
-
 void LiteralNode::genBlr(DsqlCompilerScratch* dsqlScratch)
 {
 	if (litDesc.dsc_dtype == dtype_text)
@@ -7367,9 +7365,9 @@ void NegateNode::setParameterName(dsql_par* parameter) const
 }
 
 bool NegateNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg, desc, node, forceVarChar);
 }
 
 void NegateNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -7940,16 +7938,22 @@ ValueExprNode* ParameterNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 }
 
 bool ParameterNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
 	thread_db* tdbb = JRD_get_thread_data();
 
 	const dsc oldDesc = dsqlParameter->par_desc;
 
-	if (!desc)
+	if (!desc && !node)
 		dsqlParameter->par_desc.makeNullString();
 	else
 	{
+		if (!desc)
+		{
+			MAKE_desc(dsqlScratch, &node->nodDesc, node);
+			desc = &node->nodDesc;
+		}
+
 		dsqlParameter->par_desc = *desc;
 
 		if (tdbb->getCharSet() != CS_NONE && tdbb->getCharSet() != CS_BINARY)
@@ -8211,7 +8215,7 @@ dsc* ParameterNode::execute(thread_db* tdbb, jrd_req* request) const
 				if (!blobId->isEmpty())
 				{
 					if (!request->hasInternalStatement())
-						tdbb->getTransaction()->checkBlob(tdbb, blobId, true);
+						tdbb->getTransaction()->checkBlob(tdbb, blobId, false);
 
 					if (desc->getCharSet() != CS_NONE && desc->getCharSet() != CS_BINARY)
 					{
@@ -9005,9 +9009,9 @@ void StrCaseNode::setParameterName(dsql_par* parameter) const
 }
 
 bool StrCaseNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, arg, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, arg, desc, node, forceVarChar);
 }
 
 void StrCaseNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -9221,12 +9225,6 @@ void StrLenNode::setParameterName(dsql_par* parameter) const
 	}
 
 	parameter->par_name = parameter->par_alias = alias;
-}
-
-bool StrLenNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
-{
-	return false;
 }
 
 void StrLenNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -9947,11 +9945,11 @@ void SubstringNode::setParameterName(dsql_par* parameter) const
 }
 
 bool SubstringNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, expr, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, start, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, length, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, expr, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, start, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, length, desc, node, forceVarChar);
 }
 
 void SubstringNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -10281,11 +10279,11 @@ void SubstringSimilarNode::setParameterName(dsql_par* parameter) const
 }
 
 bool SubstringSimilarNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, expr, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, pattern, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, escape, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, expr, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, pattern, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, escape, desc, node, forceVarChar);
 }
 
 void SubstringSimilarNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -10465,13 +10463,13 @@ ValueExprNode* SubstringSimilarNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		doDsqlPass(dsqlScratch, escape));
 
 	// ? SIMILAR FIELD case.
-	PASS1_set_parameter_type(dsqlScratch, node->expr, node->pattern, true);
+	PASS1_set_parameter_type(dsqlScratch, node->expr, NULL, node->pattern, true);
 
 	// FIELD SIMILAR ? case.
-	PASS1_set_parameter_type(dsqlScratch, node->pattern, node->expr, true);
+	PASS1_set_parameter_type(dsqlScratch, node->pattern, NULL, node->expr, true);
 
 	// X SIMILAR Y ESCAPE ? case.
-	PASS1_set_parameter_type(dsqlScratch, node->escape, node->pattern, true);
+	PASS1_set_parameter_type(dsqlScratch, node->escape, NULL, node->pattern, true);
 
 	return node;
 }
@@ -10667,7 +10665,7 @@ ValueExprNode* SysFuncCallNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		for (unsigned int i = 0; i < inList->items.getCount(); ++i)
 		{
 			ValueExprNode* p = inList->items[i];
-			PASS1_set_parameter_type(dsqlScratch, p, &p->nodDesc, false);
+			PASS1_set_parameter_type(dsqlScratch, p, &p->nodDesc, NULL, false);
 		}
 	}
 
@@ -10722,7 +10720,7 @@ ValueExprNode* TrimNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		doDsqlPass(dsqlScratch, value), doDsqlPass(dsqlScratch, trimChars));
 
 	// Try to force trimChars to be same type as value: TRIM(? FROM FIELD)
-	PASS1_set_parameter_type(dsqlScratch, node->trimChars, node->value, false);
+	PASS1_set_parameter_type(dsqlScratch, node->trimChars, NULL, node->value, false);
 
 	return node;
 }
@@ -10733,10 +10731,10 @@ void TrimNode::setParameterName(dsql_par* parameter) const
 }
 
 bool TrimNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, value, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, trimChars, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, value, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, trimChars, desc, node, forceVarChar);
 }
 
 void TrimNode::genBlr(DsqlCompilerScratch* dsqlScratch)
@@ -11524,7 +11522,7 @@ ValueExprNode* UdfCallNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		}
 
 		if (pos < node->dsqlFunction->udf_arguments.getCount())
-			PASS1_set_parameter_type(dsqlScratch, *ptr, &desc, false);
+			PASS1_set_parameter_type(dsqlScratch, *ptr, &desc, NULL, false);
 		else
 		{
 			// We should complain here in the future! The parameter is
@@ -11718,8 +11716,8 @@ ValueExprNode* ValueIfNode::dsqlPass(DsqlCompilerScratch* dsqlScratch)
 		doDsqlPass(dsqlScratch, trueValue),
 		doDsqlPass(dsqlScratch, falseValue));
 
-	PASS1_set_parameter_type(dsqlScratch, node->trueValue, node->falseValue, false);
-	PASS1_set_parameter_type(dsqlScratch, node->falseValue, node->trueValue, false);
+	PASS1_set_parameter_type(dsqlScratch, node->trueValue, NULL, node->falseValue, false);
+	PASS1_set_parameter_type(dsqlScratch, node->falseValue, NULL, node->trueValue, false);
 
 	return node;
 }
@@ -11730,10 +11728,10 @@ void ValueIfNode::setParameterName(dsql_par* parameter) const
 }
 
 bool ValueIfNode::setParameterType(DsqlCompilerScratch* dsqlScratch,
-	const dsc* desc, bool forceVarChar)
+	const dsc* desc, ValueExprNode* node, bool forceVarChar)
 {
-	return PASS1_set_parameter_type(dsqlScratch, trueValue, desc, forceVarChar) |
-		PASS1_set_parameter_type(dsqlScratch, falseValue, desc, forceVarChar);
+	return PASS1_set_parameter_type(dsqlScratch, trueValue, desc, node, forceVarChar) |
+		PASS1_set_parameter_type(dsqlScratch, falseValue, desc, node, forceVarChar);
 }
 
 void ValueIfNode::genBlr(DsqlCompilerScratch* dsqlScratch)

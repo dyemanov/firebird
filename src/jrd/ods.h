@@ -213,7 +213,7 @@ namespace Ods {
 const bool pag_crypt_page[pag_max + 1] = {false, false, false,
 										  false, false, true,	// data
 										  false, true, true,	// index, blob
-										  false, false};
+										  true, false};			// generators
 
 // pag_flags for any page type
 

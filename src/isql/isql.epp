@@ -45,7 +45,6 @@
 
 #include "firebird.h"
 #include <stdio.h>
-#include "../yvalve/keywords.h"
 #include "../jrd/intl.h"
 #include <stdlib.h>
 #include <stdarg.h>
@@ -1192,6 +1191,34 @@ SSHORT ISQL_get_field_length(const TEXT* field_name)
 	END_ERROR;
 
 	return l;
+}
+
+
+SSHORT ISQL_get_char_length(
+	SSHORT fieldLength,
+	SSHORT characterLengthNull, SSHORT characterLength,
+	SSHORT characterSetIdNull, SSHORT characterSetId)
+{
+	if (characterLengthNull || characterLength == 0)
+	{
+		if (!characterSetIdNull)
+		{
+			FOR CS IN RDB$CHARACTER_SETS
+				WITH CS.RDB$CHARACTER_SET_ID EQ characterSetId AND
+					 CS.RDB$BYTES_PER_CHARACTER > 0
+			{
+				fieldLength /= CS.RDB$BYTES_PER_CHARACTER;
+			}
+			END_FOR
+			ON_ERROR
+				ISQL_errmsg(fbStatus);
+			END_ERROR;
+		}
+
+		return fieldLength;
+	}
+	else
+		return characterLength;
 }
 
 

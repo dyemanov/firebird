@@ -34,6 +34,9 @@
     <ClCompile Include="..\..\..\src\auth\SecureRemotePassword\server\SrpServer.cpp">
       <Filter>AUTH files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\auth\SecDbCache.cpp">
+      <Filter>AUTH files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\src\remote\server\os\win32\server.ico">

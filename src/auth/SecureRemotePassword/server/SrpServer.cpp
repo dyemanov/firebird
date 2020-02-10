@@ -25,28 +25,51 @@
  */
 
 #include "firebird.h"
+#include "firebird/Message.h"
 
-#include "../auth/SecureRemotePassword/client/SrpClient.h"
+#include "../auth/SecureRemotePassword/server/SrpServer.h"
 #include "../auth/SecureRemotePassword/srp.h"
 #include "../common/classes/ImplementHelper.h"
 #include "../common/classes/ClumpletWriter.h"
-#include "../auth/SecureRemotePassword/Message.h"
+#include "../jrd/status.h"
+#include "../common/isc_proto.h"
 
 #include "../jrd/constants.h"
+#include "../auth/SecDbCache.h"
 
 using namespace Firebird;
+using namespace Auth;
 
 namespace {
+
+GlobalPtr<PluginDatabases> instances;
 
 const unsigned int INIT_KEY = ((~0) - 1);
 unsigned int secDbKey = INIT_KEY;
 
 const unsigned int SZ_LOGIN = 31;
 
-}
+struct Metadata
+{
+	Jrd::FbLocalStatus status;
+	FB_MESSAGE (Param, CheckStatusWrapper,
+		(FB_VARCHAR(SZ_LOGIN), login)
+	) param;
+	FB_MESSAGE (Data, CheckStatusWrapper,
+		(FB_VARCHAR(128), verifier)
+		(FB_VARCHAR(32), salt)
+	) data;
 
+	Metadata()
+		: param(&status, MasterInterfacePtr()), data(&status, MasterInterfacePtr())
+	{ }
 
-namespace Auth {
+	Metadata(MemoryPool& p)
+		: status(p), param(&status, MasterInterfacePtr()), data(&status, MasterInterfacePtr())
+	{ }
+};
+
+InitInstance<Metadata> meta;
 
 class SrpServer : public StdPlugin<IServerImpl<SrpServer, CheckStatusWrapper> >
 {
@@ -55,13 +78,8 @@ public:
 		: server(NULL), data(getPool()), account(getPool()),
 		  clientPubKey(getPool()), serverPubKey(getPool()),
 		  verifier(getPool()), salt(getPool()), sessionKey(getPool()),
-		  secDbName(NULL), cryptCallback(NULL)
-	{
-		LocalStatus ls;
-		CheckStatusWrapper s(&ls);
-		config.assignRefNoIncr(par->getFirebirdConf(&s));
-		check(&s);
-	}
+		  iParameter(par), secDbName(getPool()), cryptCallback(NULL)
+	{ }
 
 	// IServer implementation
 	int authenticate(CheckStatusWrapper* status, IServerBlock* sBlock, IWriter* writerInterface);
@@ -81,11 +99,103 @@ private:
 	UCharBuffer verifier;
 	string salt;
 	UCharBuffer sessionKey;
-	RefPtr<IFirebirdConf> config;
-	const char* secDbName;
+	RefPtr<IPluginConfig> iParameter;
+	PathName secDbName;
 	ICryptKeyCallback* cryptCallback;
 protected:
     virtual RemotePassword* RemotePasswordFactory()=0;
+};
+
+class SecurityDatabase : public VSecDb
+{
+public:
+	bool lookup(void* inMsg, void* outMsg)
+	{
+		Jrd::FbLocalStatus status;
+
+		stmt->execute(&status, tra, meta().param.getMetadata(), inMsg,
+			meta().data.getMetadata(), outMsg);
+		check(&status);
+
+		return false;	// safe default
+	}
+
+	// This 2 are needed to satisfy temporarily different calling requirements
+	static int shutdown(const int, const int, void*)
+	{
+		return instances->shutdown();
+	}
+	static void cleanup()
+	{
+		instances->shutdown();
+	}
+
+	SecurityDatabase(const char* secDbName, ICryptKeyCallback* cryptCallback)
+		: att(NULL), tra(NULL), stmt(NULL)
+	{
+		Jrd::FbLocalStatus status;
+
+		DispatcherPtr p;
+		if (cryptCallback)
+		{
+			p->setDbCryptCallback(&status, cryptCallback);
+			status->init();		// ignore possible errors like missing call in provider
+		}
+
+		ClumpletWriter dpb(ClumpletReader::dpbList, MAX_DPB_SIZE);
+		dpb.insertByte(isc_dpb_sec_attach, TRUE);
+		dpb.insertString(isc_dpb_user_name, SYSDBA_USER_NAME, fb_strlen(SYSDBA_USER_NAME));
+		dpb.insertString(isc_dpb_config, ParsedList::getNonLoopbackProviders(secDbName));
+		att = p->attachDatabase(&status, secDbName, dpb.getBufferLength(), dpb.getBuffer());
+		check(&status);
+		HANDSHAKE_DEBUG(fprintf(stderr, "Srv SRP: attached sec db %s\n", secDbName));
+
+		const UCHAR tpb[] =
+		{
+			isc_tpb_version1,
+			isc_tpb_read,
+			isc_tpb_read_committed,
+			isc_tpb_rec_version,
+			isc_tpb_wait
+		};
+		tra = att->startTransaction(&status, sizeof(tpb), tpb);
+		check(&status);
+		HANDSHAKE_DEBUG(fprintf(stderr, "Srv: SRP1: started transaction\n"));
+
+		const char* sql =
+			"SELECT PLG$VERIFIER, PLG$SALT FROM PLG$SRP WHERE PLG$USER_NAME = ? AND PLG$ACTIVE";
+		stmt = att->prepare(&status, tra, 0, sql, 3, IStatement::PREPARE_PREFETCH_METADATA);
+		if (status->getState() & IStatus::STATE_ERRORS)
+		{
+			checkStatusVectorForMissingTable(status->getErrors());
+			status_exception::raise(&status);
+		}
+	}
+
+private:
+	IAttachment* att;
+	ITransaction* tra;
+	IStatement* stmt;
+
+	~SecurityDatabase()
+	{
+		Jrd::FbLocalStatus status;
+
+		stmt->free(&status);
+		checkLogStatus(status);
+
+		tra->rollback(&status);
+		checkLogStatus(status);
+
+		att->detach(&status);
+		checkLogStatus(status);
+	}
+
+	void checkLogStatus(Jrd::FbLocalStatus& status)
+	{
+		if (!status.isSuccess())
+			iscLogStatus("Srp Server", &status);
+	}
 };
 
 template <class SHA> class SrpServerImpl FB_FINAL : public SrpServer  
@@ -99,6 +209,7 @@ protected:
 		return FB_NEW RemotePasswordImpl<SHA>;
 	}
 };
+
 
 int SrpServer::authenticate(CheckStatusWrapper* status, IServerBlock* sb, IWriter* writerInterface)
 {
@@ -126,109 +237,46 @@ int SrpServer::authenticate(CheckStatusWrapper* status, IServerBlock* sb, IWrite
 				return AUTH_MORE_DATA;
 			}
 
-			// read salt and verifier from database
-			// obviously we need something like attachments cache here
-			if (secDbKey == INIT_KEY)
-			{
-				secDbKey = config->getKey("SecurityDatabase");
-			}
+			// load verifier and salt from security database
+			Metadata messages;
+			messages.param->login.set(account.c_str());
+			messages.param->loginNull = 0;
+			messages.data.clear();
 
-			secDbName = config->asString(secDbKey);
-			if (!(secDbName && secDbName[0]))
-			{
-				Arg::Gds(isc_secdb_name).raise();
-			}
+			{ // reference & mutex scope scope
+				// Get database block from cache
+				RefPtr<CachedSecurityDatabase> instance;
+				instances->getInstance(iParameter, instance);
 
-			DispatcherPtr p;
-			IAttachment* att = NULL;
-			ITransaction* tra = NULL;
-			IStatement* stmt = NULL;
-
-			try
-			{
-				if (cryptCallback)
+				try
 				{
-					p->setDbCryptCallback(status, cryptCallback);
-					status->init();		// ignore possible errors like missing call in provider
+					MutexLockGuard g(instance->mutex, FB_FUNCTION);
+
+					secDbName = instance->secureDbName;
+					if (!instance->secDb)
+						instance->secDb = FB_NEW SecurityDatabase(instance->secureDbName, cryptCallback);
+
+					instance->secDb->lookup(messages.param.getData(), messages.data.getData());
+				}
+				catch(const Exception&)
+				{
+					instance->close();
+					throw;
 				}
 
-				ClumpletWriter dpb(ClumpletReader::dpbList, MAX_DPB_SIZE);
-				dpb.insertByte(isc_dpb_sec_attach, TRUE);
-				dpb.insertString(isc_dpb_user_name, SYSDBA_USER_NAME, fb_strlen(SYSDBA_USER_NAME));
-				dpb.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
-				att = p->attachDatabase(status, secDbName, dpb.getBufferLength(), dpb.getBuffer());
-				check(status);
-				HANDSHAKE_DEBUG(fprintf(stderr, "Srv SRP: attached sec db %s\n", secDbName));
-
-				const UCHAR tpb[] =
-				{
-					isc_tpb_version1,
-					isc_tpb_read,
-					isc_tpb_read_committed,
-					isc_tpb_rec_version,
-					isc_tpb_wait
-				};
-				tra = att->startTransaction(status, sizeof(tpb), tpb);
-				check(status);
-				HANDSHAKE_DEBUG(fprintf(stderr, "Srv: SRP1: started transaction\n"));
-
-				const char* sql =
-					"SELECT PLG$VERIFIER, PLG$SALT FROM PLG$SRP WHERE PLG$USER_NAME = ? AND PLG$ACTIVE";
-				stmt = att->prepare(status, tra, 0, sql, 3, IStatement::PREPARE_PREFETCH_METADATA);
-				if (status->getState() & IStatus::STATE_ERRORS)
-				{
-					checkStatusVectorForMissingTable(status->getErrors());
-					status_exception::raise(status);
-				}
-
-				Meta im(stmt, false);
-				Message par(im);
-				Field<Varying> login(par);
-				login = account.c_str();
-
-				Meta om(stmt, true);
-				Message dat(om);
-				check(status);
-				Field<Varying> verify(dat);
-				Field<Varying> slt(dat);
-				HANDSHAKE_DEBUG(fprintf(stderr, "Srv: SRP1: Ready to run statement with login '%s'\n", account.c_str()));
-
-				stmt->execute(status, tra, par.getMetadata(), par.getBuffer(),
-					dat.getMetadata(), dat.getBuffer());
-				check(status);
-				HANDSHAKE_DEBUG(fprintf(stderr, "Srv: SRP1: Executed statement\n"));
-
-				verifier.assign(reinterpret_cast<const UCHAR*>((const char*) verify), RemotePassword::SRP_VERIFIER_SIZE);
-				dumpIt("Srv: verifier", verifier);
-				UCharBuffer s;
-				s.assign(reinterpret_cast<const UCHAR*>((const char*) slt), RemotePassword::SRP_SALT_SIZE);
-				BigInteger(s).getText(salt);
-				dumpIt("Srv: salt", salt);
-
-				stmt->free(status);
-				check(status);
-				stmt = NULL;
-
-				tra->rollback(status);
-				check(status);
-				tra = NULL;
-
-				att->detach(status);
-				check(status);
-				att = NULL;
+				instance->close();
 			}
-			catch (const Exception&)
-			{
-				LocalStatus ls;
-				CheckStatusWrapper s(&ls);
+			HANDSHAKE_DEBUG(fprintf(stderr, "Srv: SRP1: Executed statement\n"));
 
-				if (stmt) stmt->free(&s);
-				if (tra) tra->rollback(&s);
-				if (att) att->detach(&s);
+			verifier.assign(reinterpret_cast<const UCHAR*>(messages.data->verifier.str), messages.data->verifier.length);
+			dumpIt("Srv: verifier", verifier);
 
-				throw;
-			}
+			UCharBuffer s;
+			s.assign(reinterpret_cast<const UCHAR*>(messages.data->salt.str), messages.data->salt.length);
+			BigInteger(s).getText(salt);
+			dumpIt("Srv: salt", salt);
 
+			// create SRP-calculating server
 			server = RemotePasswordFactory();
 			server->genServerKey(serverPubKey, verifier);
 
@@ -273,7 +321,7 @@ int SrpServer::authenticate(CheckStatusWrapper* status, IServerBlock* sb, IWrite
 			{
 				return AUTH_FAILED;
 			}
-			writerInterface->setDb(status, secDbName);
+			writerInterface->setDb(status, secDbName.c_str());
 			if (status->getState() & IStatus::STATE_ERRORS)
 			{
 				return AUTH_FAILED;
@@ -326,14 +374,16 @@ int SrpServer::release()
 	return 1;
 }
 
-namespace
-{
-	SimpleFactory<SrpServerImpl<Sha1> > factory_sha1;
-	SimpleFactory<SrpServerImpl<sha224> > factory_sha224;
-	SimpleFactory<SrpServerImpl<sha256> > factory_sha256;
-	SimpleFactory<SrpServerImpl<sha384> > factory_sha384;
-	SimpleFactory<SrpServerImpl<sha512> > factory_sha512;
-}
+SimpleFactory<SrpServerImpl<Sha1> > factory_sha1;
+SimpleFactory<SrpServerImpl<sha224> > factory_sha224;
+SimpleFactory<SrpServerImpl<sha256> > factory_sha256;
+SimpleFactory<SrpServerImpl<sha384> > factory_sha384;
+SimpleFactory<SrpServerImpl<sha512> > factory_sha512;
+
+} // anonymous namespace
+
+
+namespace Auth {
 
 void registerSrpServer(IPluginManager* iPlugin)
 {

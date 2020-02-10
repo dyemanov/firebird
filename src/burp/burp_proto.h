@@ -39,6 +39,7 @@ void	BURP_msg_partial(bool, USHORT, const MsgFormat::SafeArg& arg = MsgFormat::S
 void	BURP_msg_put(bool, USHORT, const MsgFormat::SafeArg& arg);
 const int BURP_MSG_GET_SIZE = 128; // Use it for buffers passed to this function.
 void	BURP_msg_get(USHORT, TEXT*, const MsgFormat::SafeArg& arg = MsgFormat::SafeArg());
+void	BURP_output(bool err, const SCHAR*, ...) ATTRIBUTE_FORMAT(2,3);
 void	BURP_output_version(void*, const TEXT*);
 void	BURP_print(bool err, USHORT, const MsgFormat::SafeArg& arg = MsgFormat::SafeArg());
 void	BURP_print(bool err, USHORT, const char* str);

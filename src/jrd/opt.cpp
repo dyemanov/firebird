@@ -990,7 +990,7 @@ static void check_indices(const CompilerScratch::csb_repeat* csb_tail)
 	// if there were no indices fetched at all but the
 	// user specified some, error out using the first index specified
 
-	if (!csb_tail->csb_indices && plan->accessType)
+	if (!csb_tail->csb_indices && plan->accessType && !tdbb->getAttachment()->isGbak())
 	{
 		// index %s cannot be used in the specified plan
 		ERR_post(Arg::Gds(isc_index_unused) << plan->accessType->items[0].indexName);
@@ -2302,8 +2302,7 @@ static RecordSource* gen_retrieval(thread_db*     tdbb,
 			// inside OptimizerRetrieval::matchOnIndexes()
 
 			if (inversion && condition &&
-				(!condition->computable(csb, INVALID_STREAM, false) ||
-				condition->findStream(stream)))
+				!condition->computable(csb, stream, false))
 			{
 				fb_assert(false);
 				inversion = NULL;
@@ -3576,11 +3575,11 @@ static void set_position(const SortNode* from_clause, SortNode* to_clause, const
 		for (const NestConst<ValueExprNode>* const to_end = to_ptr + count;
 			 to_ptr != to_end; ++to_ptr)
 		{
-			const FieldNode* fromField = (*from_ptr)->as<FieldNode>();
-			const FieldNode* toField = (*to_ptr)->as<FieldNode>();
+			const FieldNode* const fromField = (*from_ptr)->as<FieldNode>();
+			const FieldNode* const toField = (*to_ptr)->as<FieldNode>();
 
 			if ((map && map_equal(*to_ptr, *from_ptr, map)) ||
-				(!map &&
+				(!map && fromField && toField &&
 					fromField->fieldStream == toField->fieldStream &&
 					fromField->fieldId == toField->fieldId))
 			{

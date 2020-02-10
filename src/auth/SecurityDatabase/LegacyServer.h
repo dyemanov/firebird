@@ -27,19 +27,7 @@
 #ifndef AUTH_LEGACY_SERVER_H
 #define AUTH_LEGACY_SERVER_H
 
-#include "../jrd/ibase.h"
-#include "../common/utils_proto.h"
-#include "../common/sha.h"
-#include "gen/iberror.h"
-#include "../common/classes/ClumpletWriter.h"
-#include "../common/classes/ImplementHelper.h"
-
 #include "firebird/Interface.h"
-
-#ifdef HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-#include <time.h>
 
 namespace Auth {
 

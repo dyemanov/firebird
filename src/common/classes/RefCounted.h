@@ -212,7 +212,7 @@ namespace Firebird
 				}
 			}
 
-			return ptr;
+			return p;
 		}
 
 		T* ptr;

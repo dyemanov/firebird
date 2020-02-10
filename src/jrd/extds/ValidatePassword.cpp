@@ -188,7 +188,7 @@ void validatePassword(thread_db* tdbb, const PathName& file, ClumpletWriter& dpb
 	expandDatabaseName(file, list /* unused value */, &config);
 	PathName serverList = config->getPlugins(IPluginManager::TYPE_AUTH_SERVER);
 	PathName clientList = config->getPlugins(IPluginManager::TYPE_AUTH_CLIENT);
-	Auth::mergeLists(list, serverList, clientList);
+	Auth::ParsedList::mergeLists(list, serverList, clientList);
 
 	if (!list.hasData())
 	{

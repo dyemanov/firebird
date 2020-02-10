@@ -135,6 +135,7 @@ bool	get_relation(BurpGlobals* tdgbl);
 bool	get_relation_data(BurpGlobals* tdgbl);
 bool	get_sql_roles(BurpGlobals* tdgbl);
 bool	get_mapping(BurpGlobals* tdgbl);
+bool	get_db_creator(BurpGlobals* tdgbl);
 bool	get_security_class(BurpGlobals* tdgbl);
 void	get_source_blob(BurpGlobals* tdgbl, ISC_QUAD&, bool);
 USHORT	get_text(BurpGlobals* tdgbl, TEXT*, ULONG);
@@ -340,6 +341,20 @@ int RESTORE_restore (const TEXT* file_name, const TEXT* database_name)
 		}
 	END_ERROR;
 
+	if (tdgbl->global_trans)
+	{
+		BURP_verbose (68);
+		// msg 68 committing meta data
+		EXEC SQL COMMIT TRANSACTION tdgbl->global_trans;
+		if (gds_status[1])
+			general_on_error ();
+		// Check to see if there is a warning
+		if (gds_status[0] == isc_arg_gds && gds_status[1] == 0 && gds_status[2] != isc_arg_end)
+		{
+			BURP_print_warning(gds_status);
+		}
+	}
+
 	// Activate the indices for foreign keys and do another commit
 	if (!tdgbl->gbl_sw_deactivate_indexes)
 	{
@@ -462,20 +477,6 @@ int RESTORE_restore (const TEXT* file_name, const TEXT* database_name)
 		ON_ERROR
 			general_on_error ();
 		END_ERROR;
-	}
-
-	if (tdgbl->global_trans)
-	{
-		BURP_verbose (68);
-		// msg 68 committing meta data
-		EXEC SQL COMMIT TRANSACTION tdgbl->global_trans;
-		if (gds_status[1])
-			general_on_error ();
-		// Check to see if there is a warning
-		if (gds_status[0] == isc_arg_gds && gds_status[1] == 0 && gds_status[2] != isc_arg_end)
-		{
-			BURP_print_warning(gds_status);
-		}
 	}
 
 	EXEC SQL SET TRANSACTION ISOLATION LEVEL READ COMMITTED NO_AUTO_UNDO;
@@ -2927,7 +2928,7 @@ rec_type get_data(BurpGlobals* tdgbl, burp_rel* relation, bool skip_relation)
 	data.lstr_address = NULL;
 	ULONG old_length = 0;
 
-	ULONG records = 0;
+	FB_UINT64 records = 0;
 	rec_type record;
 	bool resync = false;
 
@@ -6274,9 +6275,10 @@ bool get_index(BurpGlobals* tdgbl, const burp_rel* relation)
  *
  **************************************/
 	BASED_ON RDB$INDICES.RDB$INDEX_NAME index_name;
-	att_type	attribute;
-	bool		foreign_index = false;
-	scan_attr_t		scan_next_attr;
+	att_type attribute;
+	bool foreign_index = false;
+	bool expr_index = false;
+	scan_attr_t scan_next_attr;
 
 	SSHORT count = 0, segments = 0;
 
@@ -6326,7 +6328,7 @@ bool get_index(BurpGlobals* tdgbl, const burp_rel* relation)
 				}
 				else
 				{
-					if (!X.RDB$INDEX_INACTIVE && foreign_index)
+					if (!X.RDB$INDEX_INACTIVE && (foreign_index || expr_index))
 						X.RDB$INDEX_INACTIVE = DEFERRED_ACTIVE;
 				}
 				if (tdgbl->gbl_sw_deactivate_indexes)
@@ -6366,6 +6368,12 @@ bool get_index(BurpGlobals* tdgbl, const burp_rel* relation)
 				break;
 
 			case att_index_expression_blr:
+				expr_index = true;
+				// Defer expression index activation
+				if (!X.RDB$INDEX_INACTIVE)
+					X.RDB$INDEX_INACTIVE = DEFERRED_ACTIVE;
+				if (tdgbl->gbl_sw_deactivate_indexes)
+					X.RDB$INDEX_INACTIVE = TRUE;
 				X.RDB$EXPRESSION_BLR.NULL = FALSE;
 				get_blr_blob (tdgbl, X.RDB$EXPRESSION_BLR, false);
 				break;
@@ -8081,6 +8089,70 @@ bool get_mapping(BurpGlobals* tdgbl)
 	return true;
 }
 
+bool get_db_creator(BurpGlobals* tdgbl)
+{
+/**************************************
+ *
+ *	g e t _ d b _ c r e a t o r
+ *
+ **************************************
+ *
+ * Functional description
+ *	Restore database creators
+ *
+ **************************************/
+	att_type		attribute;
+	scan_attr_t		scan_next_attr;
+	TEXT			temp[GDS_NAME_LEN];
+	SSHORT			l;
+	Firebird::string role;
+
+	if (tdgbl->runtimeODS >= DB_VERSION_DDL12)
+	{
+		STORE (REQUEST_HANDLE tdgbl->handles_db_creators_req_handle1)
+			C IN RDB$DB_CREATORS
+
+			C.RDB$USER.NULL = TRUE;
+			C.RDB$USER_TYPE.NULL = TRUE;
+
+			skip_init(&scan_next_attr);
+			while (skip_scan(&scan_next_attr), get_attribute(&attribute, tdgbl) != att_end)
+			{
+				switch (attribute)
+				{
+				case att_dbc_user:
+					C.RDB$USER.NULL = FALSE;
+					GET_TEXT(C.RDB$USER);
+					if (tdgbl->firstDbc)
+					{
+						tdgbl->firstDbc = false;
+						BURP_verbose(394);
+						// msg 394 restoring database creators
+					}
+					BURP_verbose (393, C.RDB$USER);
+					break;
+
+				case att_dbc_type:
+					C.RDB$USER_TYPE.NULL = FALSE;
+					C.RDB$USER_TYPE = (USHORT) get_int32(tdgbl);
+					break;
+
+				default:
+					// msg 395 database creator
+					bad_attribute(scan_next_attr, attribute, 395);
+					break;
+				}
+			}
+
+		END_STORE;
+		ON_ERROR
+			general_on_error ();
+		END_ERROR;
+	}
+
+	return true;
+}
+
 bool is_ascii_name (const TEXT *name, const SSHORT len)
 {
 /**************************************
@@ -8456,6 +8528,11 @@ bool get_trigger_old (BurpGlobals* tdgbl, burp_rel* relation)
 	return true;
 }
 
+void write_skip_message(const char* trigName, const char* relName)
+{
+	BURP_output(false, "gbak:Skipped trigger %s on system table %s\n", trigName, relName);
+}
+
 bool get_trigger(BurpGlobals* tdgbl)
 {
 /**************************************
@@ -8468,9 +8545,11 @@ bool get_trigger(BurpGlobals* tdgbl)
  *	Get a trigger definition in rdb$triggers.
  *
  **************************************/
-	att_type	attribute;
+	att_type attribute;
 	BASED_ON RDB$TRIGGERS.RDB$TRIGGER_NAME name;
-	scan_attr_t		scan_next_attr;
+	BASED_ON RDB$TRIGGERS.RDB$RELATION_NAME relName;
+	scan_attr_t scan_next_attr;
+	bool skipTrig = false;
 
 	isc_tr_handle local_trans = tdgbl->global_trans ? tdgbl->global_trans : gds_trans;
 
@@ -8538,6 +8617,16 @@ bool get_trigger(BurpGlobals* tdgbl)
 				case att_trig_relation_name:
 					X.RDB$RELATION_NAME.NULL = FALSE;
 					GET_TEXT(X.RDB$RELATION_NAME);
+					strcpy (relName, X.RDB$RELATION_NAME);
+
+					// Check for trigger on system relation
+					FOR (TRANSACTION_HANDLE local_trans REQUEST_HANDLE tdgbl->handles_get_trigger_req_handle2)
+						Y IN RDB$RELATIONS
+						WITH Y.RDB$RELATION_NAME EQ relName
+						 AND Y.RDB$SYSTEM_FLAG EQ 1
+
+						skipTrig = true;
+					END_FOR;
 					break;
 
 				case att_trig_sequence:
@@ -8609,6 +8698,14 @@ bool get_trigger(BurpGlobals* tdgbl)
 					break;
 				}
 			}
+
+			// Skip trigger on system relation
+			if (skipTrig)
+			{
+				write_skip_message(name, relName);
+				return true;
+			}
+
 		END_STORE;
 		ON_ERROR
 			general_on_error ();
@@ -8667,6 +8764,16 @@ bool get_trigger(BurpGlobals* tdgbl)
 				case att_trig_relation_name:
 					X.RDB$RELATION_NAME.NULL = FALSE;
 					GET_TEXT(X.RDB$RELATION_NAME);
+					strcpy (relName, X.RDB$RELATION_NAME);
+
+					// Check for trigger on system relation
+					FOR (TRANSACTION_HANDLE local_trans REQUEST_HANDLE tdgbl->handles_get_trigger_req_handle2)
+						Y IN RDB$RELATIONS
+						WITH Y.RDB$RELATION_NAME EQ relName
+						 AND Y.RDB$SYSTEM_FLAG EQ 1
+
+						skipTrig = true;
+					END_FOR;
 					break;
 
 				case att_trig_sequence:
@@ -8727,6 +8834,14 @@ bool get_trigger(BurpGlobals* tdgbl)
 					break;
 				}
 			}
+
+			// Skip trigger on system relation
+			if (skipTrig)
+			{
+				write_skip_message(name, relName);
+				return true;
+			}
+
 		END_STORE;
 		ON_ERROR
 			general_on_error ();
@@ -9480,7 +9595,7 @@ rec_type ignore_data(BurpGlobals* tdgbl, burp_rel* relation)
  *	Ignore data records for a relation.
  *
  **************************************/
-	ULONG records = 0;
+	FB_UINT64 records = 0;
 	rec_type record;
 
 	while (true)
@@ -10020,6 +10135,12 @@ bool restore(BurpGlobals* tdgbl, const TEXT* file_name, const TEXT* database_nam
 			flag = true;
 			break;
 
+		case rec_db_creator:
+			if (!get_db_creator(tdgbl))
+				return false;
+			flag = true;
+			break;
+
 		default:
 			BURP_error(43, true, SafeArg() << record);
 			// msg 43 don't recognize record type %ld
@@ -10412,7 +10533,7 @@ void update_global_field(BurpGlobals* tdgbl)
  *	The blobs have been created already.
  *
  **************************************/
-	isc_req_handle  req_handle1 = 0;
+	isc_req_handle req_handle1 = 0;
 
 	for (gfld* gfield = tdgbl->gbl_global_fields; gfield; )
 	{
@@ -10465,6 +10586,7 @@ void update_global_field(BurpGlobals* tdgbl)
 		ON_ERROR
 			general_on_error ();
 		END_ERROR;
+
 		gfld* n_gfield = gfield->gfld_next;
 		BURP_free (gfield);
 		gfield = n_gfield;

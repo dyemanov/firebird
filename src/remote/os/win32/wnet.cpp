@@ -213,14 +213,14 @@ rem_port* WNET_analyze(ClntAuthBlock* cBlock,
 									   packet->p_acpd.p_acpt_data.cstr_address);
 			cBlock->authComplete = packet->p_acpd.p_acpt_authenticated;
 			port->addServerKeys(&packet->p_acpd.p_acpt_keys);
-			cBlock->resetClnt(&file_name, &packet->p_acpd.p_acpt_keys);
+			cBlock->resetClnt(&packet->p_acpd.p_acpt_keys);
 		}
 		break;
 
 	case op_accept:
 		if (cBlock)
 		{
-			cBlock->resetClnt(&file_name);
+			cBlock->resetClnt();
 		}
 		accept = &packet->p_acpt;
 		break;
@@ -536,6 +536,7 @@ static rem_port* alloc_port( rem_port* parent)
 	if (parent)
 	{
 		delete port->port_connection;
+		port->port_connection = NULL;
 		port->port_connection = REMOTE_make_string(parent->port_connection->str_data);
 
 		port->linkParent(parent);
@@ -751,7 +752,11 @@ static void disconnect(rem_port* port)
 	}
 
 	wnet_ports->unRegisterPort(port);
-	port->release();
+
+	if (port->port_thread_guard && port->port_events_thread && !Thread::isCurrent(port->port_events_threadId))
+		port->port_thread_guard->setWait(port->port_events_thread);
+	else
+		port->release();
 }
 
 
@@ -1323,7 +1328,7 @@ static bool packet_receive(rem_port* port, UCHAR* buffer, SSHORT buffer_length, 
 
 	if (!n)
 	{
-		if (port->port_flags & PORT_detached)
+		if (port->port_flags & (PORT_detached | PORT_disconnect))
 			return false;
 
 		return wnet_error(port, "ReadFile end-of-file", isc_net_read_err, dwError);
@@ -1399,10 +1404,15 @@ static bool packet_send( rem_port* port, const SCHAR* buffer, SSHORT buffer_leng
 		status = GetOverlappedResult(port->port_pipe, &ovrl, &n, TRUE);
 		dwError = GetLastError();
 	}
-	if (!status)
+	if (!status && dwError != ERROR_NO_DATA)
 		return wnet_error(port, "WriteFile", isc_net_write_err, dwError);
 	if (n != length)
+	{
+		if (port->port_flags & (PORT_detached | PORT_disconnect))
+			return false;
+
 		return wnet_error(port, "WriteFile truncated", isc_net_write_err, dwError);
+	}
 
 #if defined(DEBUG) && defined(WNET_trace)
 	packet_print("send", reinterpret_cast<const UCHAR*>(buffer), buffer_length);

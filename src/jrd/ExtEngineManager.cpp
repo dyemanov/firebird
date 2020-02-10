@@ -33,6 +33,7 @@
 #include "../jrd/req.h"
 #include "../jrd/status.h"
 #include "../jrd/tra.h"
+#include "../dsql/BoolNodes.h"
 #include "../dsql/StmtNodes.h"
 #include "../common/os/path_utils.h"
 #include "../jrd/cmp_proto.h"
@@ -451,7 +452,7 @@ namespace
 		{
 			if (request->req_operation == jrd_req::req_evaluate)
 			{
-				trigger->execute(tdbb, request->req_trigger_action,
+				trigger->execute(tdbb, request, request->req_trigger_action,
 					getRpb(request, 0), getRpb(request, 1));
 
 				request->req_operation = jrd_req::req_return;
@@ -833,20 +834,20 @@ bool ExtEngineManager::ResultSet::fetch(thread_db* tdbb)
 //---------------------
 
 
-ExtEngineManager::Trigger::Trigger(thread_db* tdbb, MemoryPool& pool, ExtEngineManager* aExtManager,
-			IExternalEngine* aEngine, RoutineMetadata* aMetadata,
+ExtEngineManager::Trigger::Trigger(thread_db* tdbb, MemoryPool& pool, CompilerScratch* csb,
+			ExtEngineManager* aExtManager, IExternalEngine* aEngine, RoutineMetadata* aMetadata,
 			IExternalTrigger* aTrigger, const Jrd::Trigger* aTrg)
-	: extManager(aExtManager),
+	: computedStatements(pool),
+	  extManager(aExtManager),
 	  engine(aEngine),
 	  metadata(aMetadata),
 	  trigger(aTrigger),
 	  trg(aTrg),
 	  fieldsPos(pool),
-	  database(tdbb->getDatabase())
+	  varDecls(pool),
+	  database(tdbb->getDatabase()),
+	  computedCount(0)
 {
-	dsc shortDesc;
-	shortDesc.makeShort(0);
-
 	jrd_rel* relation = trg->relation;
 
 	if (relation)
@@ -856,6 +857,7 @@ ExtEngineManager::Trigger::Trigger(thread_db* tdbb, MemoryPool& pool, ExtEngineM
 		for (FB_SIZE_T i = 0; i < relation->rel_fields->count(); ++i)
 		{
 			jrd_fld* field = (*relation->rel_fields)[i];
+
 			if (field)
 				fieldsMap.put(field->fld_name, (USHORT) i);
 		}
@@ -876,6 +878,8 @@ ExtEngineManager::Trigger::Trigger(thread_db* tdbb, MemoryPool& pool, ExtEngineM
 			else
 				fieldsPos.add(pos);
 		}
+
+		setupComputedFields(tdbb, pool, csb);
 	}
 }
 
@@ -886,7 +890,7 @@ ExtEngineManager::Trigger::~Trigger()
 }
 
 
-void ExtEngineManager::Trigger::execute(thread_db* tdbb, unsigned action,
+void ExtEngineManager::Trigger::execute(thread_db* tdbb, jrd_req* request, unsigned action,
 	record_param* oldRpb, record_param* newRpb) const
 {
 	EngineAttachmentInfo* attInfo = extManager->getEngineAttachment(tdbb, engine);
@@ -898,10 +902,10 @@ void ExtEngineManager::Trigger::execute(thread_db* tdbb, unsigned action,
 	Array<UCHAR> newMsg;
 
 	if (oldRpb)
-		setValues(tdbb, oldMsg, oldRpb);
+		setValues(tdbb, request, oldMsg, oldRpb);
 
 	if (newRpb)
-		setValues(tdbb, newMsg, newRpb);
+		setValues(tdbb, request, newMsg, newRpb);
 
 	{	// scope
 		EngineCheckout cout(tdbb, FB_FUNCTION);
@@ -927,7 +931,7 @@ void ExtEngineManager::Trigger::execute(thread_db* tdbb, unsigned action,
 			bool readonly = !EVL_field(newRpb->rpb_relation, record, fieldPos, &target) &&
 				target.dsc_address && !(target.dsc_flags & DSC_null);
 
-			if (!readonly)
+			if (!readonly && target.dsc_address)
 			{
 				SSHORT* nullSource = (SSHORT*) (p + (IPTR) format->fmt_desc[i * 2 + 1].dsc_address);
 
@@ -946,7 +950,99 @@ void ExtEngineManager::Trigger::execute(thread_db* tdbb, unsigned action,
 }
 
 
-void ExtEngineManager::Trigger::setValues(thread_db* tdbb, Array<UCHAR>& msgBuffer,
+void ExtEngineManager::Trigger::setupComputedFields(thread_db* tdbb, MemoryPool& pool, CompilerScratch* csb)
+{
+	USHORT varId = 0;
+
+	fb_assert(NEW_CONTEXT_VALUE == OLD_CONTEXT_VALUE + 1);
+
+	for (unsigned context = OLD_CONTEXT_VALUE; context <= NEW_CONTEXT_VALUE; ++context)	// OLD (0), NEW (1)
+	{
+		for (FB_SIZE_T i = 0; i < trg->relation->rel_fields->count(); ++i)
+		{
+			jrd_fld* field = (*trg->relation->rel_fields)[i];
+			if (!field || !field->fld_computation)
+				continue;
+
+			if (context == OLD_CONTEXT_VALUE)	// count once
+				++computedCount;
+
+			DeclareVariableNode* declareNode = FB_NEW_POOL(pool) DeclareVariableNode(pool);
+			declareNode->varId = varId;
+
+			declareNode->varDesc = trg->relation->rel_current_format->fmt_desc[i];
+
+			// For CHAR fields, change variable type to VARCHAR to avoid manual INTL adjustments for multi-byte.
+			if (declareNode->varDesc.isText())
+			{
+				declareNode->varDesc.dsc_dtype = dtype_varying;
+				declareNode->varDesc.dsc_length += sizeof(USHORT);
+			}
+
+			varDecls.push(declareNode);
+
+			csb->csb_variables = vec<DeclareVariableNode*>::newVector(
+				*tdbb->getDefaultPool(), csb->csb_variables, varId);
+
+			ValueExprNode* exprNode = field->fld_computation;
+
+			if (context == NEW_CONTEXT_VALUE)
+			{
+				StreamType map[1];
+				map[OLD_CONTEXT_VALUE] = NEW_CONTEXT_VALUE;	// map context 0 (OLD) to 1 (NEW)
+
+				AutoSetRestore<USHORT> autoRemapVariable(&csb->csb_remap_variable,
+					(csb->csb_variables ? csb->csb_variables->count() : 0) + 1);
+
+				exprNode = NodeCopier::copy(tdbb, csb, exprNode, map);
+			}
+
+			VariableNode* varNode = FB_NEW_POOL(pool) VariableNode(pool);
+			varNode->varId = varId;
+
+			AssignmentNode* assignNode = FB_NEW_POOL(pool) AssignmentNode(pool);
+			assignNode->asgnFrom = exprNode;
+			assignNode->asgnTo = varNode;
+
+			// Do not run the assignment for invalid RPBs (NEW in DELETE, OLD in INSERT).
+
+			SLONG* actionPtr = FB_NEW_POOL(pool) SLONG(INFO_TYPE_TRIGGER_ACTION);
+
+			LiteralNode* actionLiteral = FB_NEW_POOL(pool) LiteralNode(pool);
+			actionLiteral->litDesc.dsc_dtype = dtype_long;
+			actionLiteral->litDesc.dsc_length = sizeof(SLONG);
+			actionLiteral->litDesc.dsc_scale = 0;
+			actionLiteral->litDesc.dsc_sub_type = 0;
+			actionLiteral->litDesc.dsc_address = reinterpret_cast<UCHAR*>(actionPtr);
+
+			InternalInfoNode* internalInfo = FB_NEW_POOL(pool) InternalInfoNode(pool, actionLiteral);
+
+			SLONG* comparePtr = FB_NEW_POOL(pool) SLONG(context == OLD_CONTEXT_VALUE ? TRIGGER_INSERT : TRIGGER_DELETE);
+
+			LiteralNode* compareLiteral = FB_NEW_POOL(pool) LiteralNode(pool);
+			compareLiteral->litDesc.dsc_dtype = dtype_long;
+			compareLiteral->litDesc.dsc_length = sizeof(SLONG);
+			compareLiteral->litDesc.dsc_scale = 0;
+			compareLiteral->litDesc.dsc_sub_type = 0;
+			compareLiteral->litDesc.dsc_address = reinterpret_cast<UCHAR*>(comparePtr);
+
+			ComparativeBoolNode* cmp = FB_NEW_POOL(pool) ComparativeBoolNode(pool,
+				blr_neq, internalInfo, compareLiteral);
+
+			IfNode* ifNode = FB_NEW_POOL(pool) IfNode(pool);
+			ifNode->condition = cmp;
+			ifNode->trueAction = assignNode;
+
+			computedStatements.add(declareNode);
+			computedStatements.add(ifNode);
+
+			++varId;
+		}
+	}
+}
+
+
+void ExtEngineManager::Trigger::setValues(thread_db* tdbb, jrd_req* request, Array<UCHAR>& msgBuffer,
 	record_param* rpb) const
 {
 	if (!rpb || !rpb->rpb_record)
@@ -955,22 +1051,41 @@ void ExtEngineManager::Trigger::setValues(thread_db* tdbb, Array<UCHAR>& msgBuff
 	UCHAR* p = msgBuffer.getBuffer(format->fmt_length);
 	memset(p, 0, format->fmt_length);
 
+	// NEW variables comes after OLD ones.
+	USHORT computedVarId =
+		request->req_rpb.getCount() >= NEW_CONTEXT_VALUE && rpb == &request->req_rpb[NEW_CONTEXT_VALUE] ?
+			computedCount : 0;
+
 	for (unsigned i = 0; i < format->fmt_count / 2u; ++i)
 	{
 		USHORT fieldPos = fieldsPos[i];
+		SSHORT* nullTarget = (SSHORT*) (p + (IPTR) format->fmt_desc[i * 2 + 1].dsc_address);
 
 		dsc source;
-		EVL_field(rpb->rpb_relation, rpb->rpb_record, fieldPos, &source);
-		// CVC: I'm not sure why it's not important to check EVL_field's result.
+		dsc target = format->fmt_desc[i * 2];
+		target.dsc_address += (IPTR) p;
 
-		SSHORT* nullTarget = (SSHORT*) (p + (IPTR) format->fmt_desc[i * 2 + 1].dsc_address);
-		*nullTarget = (source.dsc_flags & DSC_null) != 0 ? -1 : 0;
+		const jrd_fld* field = (*rpb->rpb_relation->rel_fields)[fieldPos];
 
-		if (*nullTarget == 0)
+		if (field->fld_computation)
 		{
-			dsc target = format->fmt_desc[i * 2];
-			target.dsc_address += (IPTR) p;
-			MOV_move(tdbb, &source, &target);
+			const DeclareVariableNode* varDecl = varDecls[computedVarId++];
+			impure_value* varImpure = request->getImpure<impure_value>(varDecl->impureOffset);
+
+			*nullTarget = (varImpure->vlu_desc.dsc_flags & DSC_null) != 0 ? -1 : 0;
+
+			if (*nullTarget == 0)
+				MOV_move(tdbb, &varImpure->vlu_desc, &target);
+		}
+		else
+		{
+			if (!EVL_field(rpb->rpb_relation, rpb->rpb_record, fieldPos, &source))
+				source.dsc_flags |= DSC_null;
+
+			*nullTarget = (source.dsc_flags & DSC_null) != 0 ? -1 : 0;
+
+			if (*nullTarget == 0)
+				MOV_move(tdbb, &source, &target);
 		}
 	}
 }
@@ -1373,10 +1488,11 @@ void ExtEngineManager::makeTrigger(thread_db* tdbb, CompilerScratch* csb, Jrd::T
 
 	try
 	{
-		trg->extTrigger = FB_NEW_POOL(getPool()) Trigger(tdbb, pool, this, attInfo->engine,
+		trg->extTrigger = FB_NEW_POOL(getPool()) Trigger(tdbb, pool, csb, this, attInfo->engine,
 			metadata.release(), externalTrigger, trg);
 
 		CompoundStmtNode* mainNode = FB_NEW_POOL(getPool()) CompoundStmtNode(getPool());
+		mainNode->statements.append(trg->extTrigger->computedStatements);
 
 		ExtTriggerNode* extTriggerNode = FB_NEW_POOL(getPool()) ExtTriggerNode(getPool(),
 			trg->extTrigger);

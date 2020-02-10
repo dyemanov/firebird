@@ -2494,6 +2494,8 @@ SLONG MET_lookup_index_name(thread_db* tdbb,
 	{
 		if (X.RDB$INDEX_INACTIVE == 0)
 			*status = MET_object_active;
+		else if (X.RDB$INDEX_INACTIVE == 3)
+			*status = MET_object_deferred_active;
 		else
 			*status = MET_object_inactive;
 
@@ -4950,6 +4952,8 @@ void scan_partners(thread_db* tdbb, jrd_rel* relation)
 			RC.RDB$CONSTRAINT_TYPE EQ FOREIGN_KEY AND
 			IDX.RDB$RELATION_NAME EQ relation->rel_name.c_str() AND
 			IND.RDB$INDEX_NAME EQ IDX.RDB$FOREIGN_KEY AND
+			IDX.RDB$INDEX_ID > 0 AND
+			IND.RDB$INDEX_ID > 0 AND
 			IND.RDB$UNIQUE_FLAG = 1
 	{
 		//// ASF: Hack fix for CORE-4304, until nasty interactions between dfw and met are not resolved.
@@ -5008,6 +5012,8 @@ void scan_partners(thread_db* tdbb, jrd_rel* relation)
 		IDX IN RDB$INDICES CROSS
 			IND IN RDB$INDICES WITH
 			IDX.RDB$UNIQUE_FLAG = 1 AND
+			IDX.RDB$INDEX_ID > 0 AND
+			IND.RDB$INDEX_ID > 0 AND
 			IDX.RDB$RELATION_NAME EQ relation->rel_name.c_str() AND
 			IND.RDB$FOREIGN_KEY EQ IDX.RDB$INDEX_NAME
 	{

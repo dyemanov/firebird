@@ -41,6 +41,7 @@
 #include "../common/classes/ImplementHelper.h"
 #include "../common/classes/ClumpletWriter.h"
 #include "../common/StatusHolder.h"
+#include "../common/security.h"
 #include "firebird/Interface.h"
 
 // Here we use version-independent symbolic link (or copy) of actual database
@@ -131,7 +132,7 @@ void SecurityDatabaseManagement::start(Firebird::CheckStatusWrapper* st, Firebir
 
 		Firebird::ClumpletWriter dpb(Firebird::ClumpletReader::dpbList, MAX_DPB_SIZE);
 		dpb.insertByte(isc_dpb_sec_attach, TRUE);
-		dpb.insertString(isc_dpb_config, EMBEDDED_PROVIDERS, fb_strlen(EMBEDDED_PROVIDERS));
+		dpb.insertString(isc_dpb_config, Auth::ParsedList::getNonLoopbackProviders(secDbName));
 
 		unsigned int authBlockSize;
 		const unsigned char* authBlock = logonInfo->authBlock(&authBlockSize);
